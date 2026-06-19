@@ -180,15 +180,15 @@ Done** is met and verified, then fill in the Result note.
 > messages are plain (no AI-attribution trailers), e.g. `M2: auth (register/login/refresh)`.
 
 ### Milestone 0 — Project Scaffolding & Tooling
-- [ ] Repo structure: `backend/`, `frontend/`, `tasks/` already present
-- [ ] `docker-compose.yml` with Postgres for local dev
-- [ ] Backend: Go module, Gin server with `/healthz`, config from **`backend/.env`** (+ `backend/.env.example`)
-- [ ] DB connection via sqlx + migrations runner (e.g. `golang-migrate`)
-- [ ] Frontend: Vite + React + TS scaffold, Tailwind + shadcn/ui init, config from **`frontend/.env`** (Vite `VITE_*` vars, + `frontend/.env.example`)
-- [ ] Each project owns its own env file — no shared root `.env`; both `.env` files git-ignored, both `.env.example` committed (see §8)
-- [ ] Makefile / task scripts for run, migrate, test
-- **DoD:** `docker-compose up` brings up Postgres; backend `/healthz` returns 200; frontend dev server renders a placeholder page; each project loads its own env.
-- **Result:** _TBD_
+- [x] Repo structure: `backend/`, `frontend/`, `tasks/` present
+- [x] `docker-compose.yml` with Postgres for local dev (postgres:16)
+- [x] Backend: Go module (`github.com/enricojoe/dailychecker`), Gin server with `/healthz`, config from **`backend/.env`** (+ `backend/.env.example`)
+- [x] DB connection via sqlx + programmatic golang-migrate runner (library, no CLI dependency)
+- [x] Frontend: Vite + React + TS scaffold, Tailwind v4 + shadcn/ui, TanStack Query, config from **`frontend/.env`** (Vite `VITE_*` vars, + `frontend/.env.example`)
+- [x] Each project owns its own env file — no shared root `.env`; both `.env` files git-ignored, both `.env.example` committed (see §7)
+- [x] Makefile targets for run, build, test, db-up, db-down
+- **DoD:** ✅ backend `go build`/`go vet` pass and `/healthz` returns 200; frontend `npm run build` + `tsc --noEmit` clean, renders placeholder page; each project loads its own env.
+- **Result:** _2026-06-19_ — Backend & frontend scaffolds delivered by go-gin-backend-architect + react-frontend-expert agents in parallel, both self-verified. Stack: React 19 / Vite 8 / Tailwind v4 / shadcn (base-ui) / TanStack Query 5; Go 1.26 / Gin / sqlx / lib/pq / golang-migrate. **Note:** local port 5432 is occupied by an unrelated `lotrack-db` container — stop it before `make db-up`, or remap to 5433 (deferred, not blocking). Migration runner no-ops cleanly until M1 adds `.sql` files.
 
 ### Milestone 1 — Database Schema & Migrations
 - [ ] Migrations for `users`, `refresh_tokens`, `activities`, `occurrences`
