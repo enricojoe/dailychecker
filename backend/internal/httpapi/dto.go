@@ -2,6 +2,28 @@
 // request/response DTOs, and HTTP handlers. No business logic lives here.
 package httpapi
 
+// ── Occurrence DTOs ──────────────────────────────────────────────────────────
+
+// PatchOccurrenceRequest is the JSON body for PATCH /api/occurrences/:id.
+// state must be one of "pending", "partial", or "done".
+type PatchOccurrenceRequest struct {
+	State string `json:"state" binding:"required"`
+}
+
+// CalendarQueryRequest carries validated query params for
+// GET /api/history/calendar.
+type CalendarQueryRequest struct {
+	From string `form:"from" binding:"required"`
+	To   string `form:"to"   binding:"required"`
+}
+
+// ActivityHistoryQueryRequest carries validated query params for
+// GET /api/history/activities/:id.
+type ActivityHistoryQueryRequest struct {
+	From string `form:"from" binding:"required"`
+	To   string `form:"to"   binding:"required"`
+}
+
 // ── Activity DTOs ────────────────────────────────────────────────────────────
 
 // CreateActivityRequest is the JSON body for POST /api/activities.

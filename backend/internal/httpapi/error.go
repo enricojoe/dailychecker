@@ -6,6 +6,7 @@ import (
 
 	"github.com/enricojoe/dailychecker/internal/activities"
 	"github.com/enricojoe/dailychecker/internal/auth"
+	"github.com/enricojoe/dailychecker/internal/occurrences"
 	"github.com/enricojoe/dailychecker/internal/users"
 	"github.com/gin-gonic/gin"
 )
@@ -39,6 +40,12 @@ func respondError(c *gin.Context, err error) {
 		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: "cannot assign a parent to an activity that already has children"})
 	case errors.Is(err, activities.ErrInvalidSchedule):
 		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: "invalid schedule: weekly frequency requires at least one day_of_week; daily frequency requires none"})
+
+	// Occurrences errors.
+	case errors.Is(err, occurrences.ErrNotFound):
+		c.JSON(http.StatusNotFound, errResponse{Error: "occurrence not found"})
+	case errors.Is(err, occurrences.ErrInvalidState):
+		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: "state must be one of: pending, partial, done"})
 
 	default:
 		c.JSON(http.StatusInternalServerError, errResponse{Error: "internal server error"})

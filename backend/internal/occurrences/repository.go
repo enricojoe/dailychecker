@@ -38,6 +38,15 @@ type Occurrence struct {
 	DigestNotifiedAt       *time.Time `db:"digest_notified_at"        json:"digest_notified_at,omitempty"`
 }
 
+// CalendarDay holds aggregated occurrence counts for a single calendar date.
+type CalendarDay struct {
+	Date    time.Time `db:"occur_date"`
+	Pending int       `db:"pending"`
+	Partial int       `db:"partial"`
+	Done    int       `db:"done"`
+	Total   int       `db:"total"`
+}
+
 // Repository is the data-access contract consumed by the service layer.
 type Repository interface {
 	// Upsert inserts an occurrence with state='pending' for (activityID, date).
@@ -62,6 +71,18 @@ type Repository interface {
 	// When state is 'done', completed_at is set to NOW(); otherwise it is
 	// cleared to NULL. Returns the updated occurrence, or ErrNotFound.
 	UpdateState(ctx context.Context, id string, state string) (*Occurrence, error)
+
+	// ListGroupByParentAndDate returns all occurrences for a parent activity and
+	// all of its direct children on the given date. The parent occurrence appears
+	// first (parent_id IS NULL on its activity), children follow. Uses a single
+	// JOIN — no N+1.  Returns ErrNotFound when the parent occurrence does not
+	// exist on that date.
+	ListGroupByParentAndDate(ctx context.Context, parentActivityID string, date time.Time) ([]*Occurrence, error)
+
+	// ListCalendarSummary returns per-day aggregated counts of pending/partial/done
+	// occurrences owned by userID within the inclusive date range [from, to].
+	// Uses a single grouped JOIN query — no N+1.
+	ListCalendarSummary(ctx context.Context, userID string, from, to time.Time) ([]*CalendarDay, error)
 }
 
 type sqlxRepository struct {
@@ -163,4 +184,60 @@ func (r *sqlxRepository) UpdateState(ctx context.Context, id string, state strin
 		return nil, fmt.Errorf("occurrences: update state: %w", err)
 	}
 	return &o, nil
+}
+
+func (r *sqlxRepository) ListGroupByParentAndDate(
+	ctx context.Context, parentActivityID string, date time.Time,
+) ([]*Occurrence, error) {
+	// Fetch occurrences for the parent activity and all of its direct children
+	// on the given date in a single JOIN. The parent row comes first (parent_id
+	// IS NULL), children follow in sort_order/created_at order.
+	const q = `
+		SELECT o.id,
+		       o.activity_id,
+		       o.occur_date,
+		       o.state,
+		       o.completed_at,
+		       o.per_activity_notified_at,
+		       o.digest_notified_at
+		FROM   occurrences o
+		JOIN   activities  a ON a.id = o.activity_id
+		WHERE  o.occur_date = $2
+		  AND  (a.id = $1 OR a.parent_id = $1)
+		ORDER  BY a.parent_id NULLS FIRST, a.sort_order, a.created_at`
+
+	var list []*Occurrence
+	if err := r.db.SelectContext(ctx, &list, q, parentActivityID, date); err != nil {
+		return nil, fmt.Errorf("occurrences: list group by parent and date: %w", err)
+	}
+	if len(list) == 0 {
+		return nil, ErrNotFound
+	}
+	return list, nil
+}
+
+func (r *sqlxRepository) ListCalendarSummary(
+	ctx context.Context, userID string, from, to time.Time,
+) ([]*CalendarDay, error) {
+	// Single grouped JOIN: count per (date, state) pivot across the date range.
+	// FILTER syntax keeps state counts without a sub-query.
+	const q = `
+		SELECT
+		    o.occur_date,
+		    COUNT(*) FILTER (WHERE o.state = 'pending') AS pending,
+		    COUNT(*) FILTER (WHERE o.state = 'partial') AS partial,
+		    COUNT(*) FILTER (WHERE o.state = 'done')    AS done,
+		    COUNT(*) AS total
+		FROM   occurrences o
+		JOIN   activities  a ON a.id = o.activity_id
+		WHERE  a.user_id    = $1
+		  AND  o.occur_date BETWEEN $2 AND $3
+		GROUP  BY o.occur_date
+		ORDER  BY o.occur_date`
+
+	var list []*CalendarDay
+	if err := r.db.SelectContext(ctx, &list, q, userID, from, to); err != nil {
+		return nil, fmt.Errorf("occurrences: list calendar summary: %w", err)
+	}
+	return list, nil
 }

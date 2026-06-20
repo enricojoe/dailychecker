@@ -15,6 +15,7 @@ import (
 	"github.com/enricojoe/dailychecker/internal/config"
 	"github.com/enricojoe/dailychecker/internal/db"
 	"github.com/enricojoe/dailychecker/internal/httpapi"
+	"github.com/enricojoe/dailychecker/internal/occurrences"
 	"github.com/enricojoe/dailychecker/internal/users"
 )
 
@@ -41,6 +42,12 @@ func main() {
 		log.Fatalf("main: migrations: %v", err)
 	}
 
+	// Load the Jakarta timezone once; fail fast on misconfiguration.
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		log.Fatalf("main: load timezone %q: %v", cfg.Timezone, err)
+	}
+
 	// Construct repositories and services — dependencies flow inward.
 	userRepo := users.NewRepository(database)
 	tokenRepo := auth.NewTokenRepository(database)
@@ -49,7 +56,10 @@ func main() {
 	actRepo := activities.NewRepository(database)
 	actSvc := activities.NewService(actRepo)
 
-	router := httpapi.NewRouter(authSvc, actSvc, cfg.JWTSecret)
+	occRepo := occurrences.NewRepository(database)
+	occSvc := occurrences.NewService(occRepo, actRepo, loc)
+
+	router := httpapi.NewRouter(authSvc, actSvc, occSvc, cfg.JWTSecret)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

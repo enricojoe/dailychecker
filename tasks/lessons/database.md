@@ -30,3 +30,9 @@
 - **Context:** DailyChecker — `internal/db` `TestMigrationsUpDown` ran an up→down→up cycle against the shared `dailychecker` test DB; all other integration-test packages use the same DB.
 - **Mistake:** `go test ./...` runs package test binaries IN PARALLEL by default. The `down` phase dropped all tables mid-flight, so concurrent packages failed intermittently with `pq: relation "occurrences" does not exist (42P01)`. `go test -p 1` masked it; the default run failed. Test caching/timing hid it on the first M3 run.
 - **Correct Pattern:** Any test that DROPs/recreates schema must run against its OWN isolated, throwaway database — never the shared one. Derive an admin DSN (point the URL path at the `postgres` maintenance DB), `CREATE DATABASE test_xxx_<millis>_<pid>` on a short-lived `*sql.DB` (CREATE/DROP DATABASE can't run in a transaction), run the cycle there, then terminate connections + `DROP DATABASE` in cleanup. Never make the suite depend on `-p 1`. Requires the dev role to have `CREATEDB`.
+
+## Inject the date, not the clock — keep time-dependent logic unit-testable
+
+- **Context:** DailyChecker M4 — occurrence generation for "due today" activities (daily/weekly schedules in Asia/Jakarta).
+- **Mistake (avoided):** A subagent claimed it couldn't test "weekly activity does NOT generate on the wrong weekday" without manipulating the wall clock, so it left that DoD case untested.
+- **Correct Pattern:** Only the thin "what is today" boundary should read `time.Now()` (`Today()` → `todayDate()`); the actual logic (`GenerateForDate(ctx, userID, date)`) takes the date as a parameter. So weekly due-logic is tested directly by passing a known Monday vs Tuesday (`time.Date(2026,6,22,…)` is a Monday, the 23rd a Tuesday) and asserting occurrence counts — no clock injection needed. Push `time.Now()` to the edge; pass concrete dates into pure/business functions.

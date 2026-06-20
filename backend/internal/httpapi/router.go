@@ -6,13 +6,19 @@ import (
 
 	"github.com/enricojoe/dailychecker/internal/activities"
 	"github.com/enricojoe/dailychecker/internal/auth"
+	"github.com/enricojoe/dailychecker/internal/occurrences"
 	"github.com/gin-gonic/gin"
 )
 
 // NewRouter constructs and returns the configured Gin engine with all routes
 // and middleware registered. It accepts concrete service pointers for each
 // feature domain and the JWT secret for the RequireAuth middleware.
-func NewRouter(authSvc *auth.Service, actSvc *activities.Service, jwtSecret string) *gin.Engine {
+func NewRouter(
+	authSvc *auth.Service,
+	actSvc *activities.Service,
+	occSvc *occurrences.Service,
+	jwtSecret string,
+) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
@@ -20,6 +26,7 @@ func NewRouter(authSvc *auth.Service, actSvc *activities.Service, jwtSecret stri
 
 	ah := &authHandler{svc: authSvc}
 	acth := &activitiesHandler{svc: actSvc}
+	occh := &occurrencesHandler{svc: occSvc}
 
 	api := r.Group("/api")
 
@@ -42,6 +49,16 @@ func NewRouter(authSvc *auth.Service, actSvc *activities.Service, jwtSecret stri
 	actGroup.GET("/:id", acth.getByID)
 	actGroup.PATCH("/:id", acth.patch)
 	actGroup.DELETE("/:id", acth.del)
+
+	// Occurrences — all protected.
+	protected.GET("/today", occh.today)
+	protected.PATCH("/occurrences/:id", occh.patchOccurrence)
+
+	// History — all protected.
+	historyGroup := protected.Group("/history")
+	historyGroup.GET("/calendar", occh.calendarSummary)
+	historyGroup.GET("/calendar/:date", occh.calendarDay)
+	historyGroup.GET("/activities/:id", occh.activityHistory)
 
 	return r
 }

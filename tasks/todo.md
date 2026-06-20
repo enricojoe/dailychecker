@@ -7,7 +7,7 @@
   - [x] M1 — Database schema & migrations
   - [x] M2 — Auth (register/login/refresh) → See [tasks/plans/m2-auth.md](plans/m2-auth.md)
   - [x] M3 — Activities & sub-activities + state rollup → See [tasks/plans/m3-activities-rollup.md](plans/m3-activities-rollup.md)
-  - [ ] M4 — Occurrences, today view & history
+  - [x] M4 — Occurrences, today view & history → See [tasks/plans/m4-occurrences-today-history.md](plans/m4-occurrences-today-history.md)
   - [ ] M5 — Telegram integration (linking + sending)
   - [ ] M6 — Scheduler (per-activity reminders + nightly digest)
   - [ ] M7 — Frontend: auth & shell

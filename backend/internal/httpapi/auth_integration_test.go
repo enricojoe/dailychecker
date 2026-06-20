@@ -15,6 +15,7 @@ import (
 	"github.com/enricojoe/dailychecker/internal/auth"
 	"github.com/enricojoe/dailychecker/internal/config"
 	"github.com/enricojoe/dailychecker/internal/httpapi"
+	"github.com/enricojoe/dailychecker/internal/occurrences"
 	"github.com/enricojoe/dailychecker/internal/testhelper"
 	"github.com/enricojoe/dailychecker/internal/users"
 	"github.com/gin-gonic/gin"
@@ -41,6 +42,12 @@ func TestMain(m *testing.M) {
 		JWTSecret:       testJWTSecret,
 		AccessTokenTTL:  time.Minute,
 		RefreshTokenTTL: 24 * time.Hour,
+		Timezone:        "Asia/Jakarta",
+	}
+
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		panic("testhelper: load timezone: " + err.Error())
 	}
 
 	userRepo := users.NewRepository(testDB)
@@ -50,7 +57,10 @@ func TestMain(m *testing.M) {
 	actRepo := activities.NewRepository(testDB)
 	actSvc := activities.NewService(actRepo)
 
-	testRouter = httpapi.NewRouter(authSvc, actSvc, cfg.JWTSecret)
+	occRepo := occurrences.NewRepository(testDB)
+	occSvc := occurrences.NewService(occRepo, actRepo, loc)
+
+	testRouter = httpapi.NewRouter(authSvc, actSvc, occSvc, cfg.JWTSecret)
 
 	code := m.Run()
 	testDB.Close()
