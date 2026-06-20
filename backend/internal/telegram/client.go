@@ -21,6 +21,19 @@ type Client interface {
 	SendMessage(ctx context.Context, chatID int64, text string) error
 }
 
+// WebhookClient extends Client with webhook registration/de-registration
+// methods. Callers that need only SendMessage accept Client; those wiring the
+// webhook lifecycle accept WebhookClient.
+type WebhookClient interface {
+	Client
+	// SetWebhook registers webhookURL with the Telegram Bot API, optionally
+	// protected by secret (X-Telegram-Bot-Api-Secret-Token). Pass an empty
+	// secret to omit the field.  The token is never logged.
+	SetWebhook(ctx context.Context, webhookURL, secret string) error
+	// DeleteWebhook removes any previously registered webhook.
+	DeleteWebhook(ctx context.Context) error
+}
+
 // httpClient is the real implementation. It calls the Telegram Bot API over
 // HTTPS. baseURL is overridable so tests can point at an httptest.Server
 // instead of the public internet.
@@ -31,7 +44,7 @@ type httpClient struct {
 	lastSend time.Time // simple min-interval throttle — not concurrency-safe by itself
 }
 
-// NewClient returns a Client that talks to the Telegram Bot API.
+// NewClient returns a WebhookClient that talks to the Telegram Bot API.
 // Pass a non-nil *http.Client to control timeouts and transport (useful for
 // tests that inject an httptest.Server via a custom Transport). If nil, a
 // sensible default is used.
@@ -40,7 +53,7 @@ type httpClient struct {
 // httptest.Server URL in tests to avoid real network calls.
 //
 // The bot token is never logged.
-func NewClient(token, baseURL string, httpCli *http.Client) Client {
+func NewClient(token, baseURL string, httpCli *http.Client) WebhookClient {
 	if httpCli == nil {
 		httpCli = &http.Client{Timeout: 10 * time.Second}
 	}
@@ -169,5 +182,84 @@ func (c *httpClient) SendMessage(ctx context.Context, chatID int64, text string)
 			&tgAPIError{Code: tgResp.ErrorCode, Description: tgResp.Description})
 	}
 
+	return nil
+}
+
+// setWebhookRequest is the JSON body for the setWebhook Bot API call.
+type setWebhookRequest struct {
+	URL         string `json:"url"`
+	SecretToken string `json:"secret_token,omitempty"`
+}
+
+// SetWebhook registers webhookURL with the Telegram Bot API. If secret is
+// non-empty it is sent as "secret_token" so Telegram includes it in the
+// X-Telegram-Bot-Api-Secret-Token header on every update delivery.
+// The token and secret are never logged.
+func (c *httpClient) SetWebhook(ctx context.Context, webhookURL, secret string) error {
+	payload := setWebhookRequest{URL: webhookURL, SecretToken: secret}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("telegram: marshal setWebhook: %w", err)
+	}
+
+	// Note: the URL path includes the bot token, which must not appear in logs.
+	url := fmt.Sprintf("%s/bot%s/setWebhook", c.baseURL, c.token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("telegram: build setWebhook request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("telegram: setWebhook request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("telegram: setWebhook read response: %w", err)
+	}
+
+	var tgResp tgResponse
+	if err := json.Unmarshal(raw, &tgResp); err != nil {
+		return fmt.Errorf("telegram: setWebhook decode response: %w", err)
+	}
+	if !tgResp.OK {
+		return fmt.Errorf("telegram: setWebhook: %w",
+			&tgAPIError{Code: tgResp.ErrorCode, Description: tgResp.Description})
+	}
+	return nil
+}
+
+// DeleteWebhook removes any previously registered webhook via the Telegram
+// Bot API.
+func (c *httpClient) DeleteWebhook(ctx context.Context) error {
+	url := fmt.Sprintf("%s/bot%s/deleteWebhook", c.baseURL, c.token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte("{}")))
+	if err != nil {
+		return fmt.Errorf("telegram: build deleteWebhook request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("telegram: deleteWebhook request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("telegram: deleteWebhook read response: %w", err)
+	}
+
+	var tgResp tgResponse
+	if err := json.Unmarshal(raw, &tgResp); err != nil {
+		return fmt.Errorf("telegram: deleteWebhook decode response: %w", err)
+	}
+	if !tgResp.OK {
+		return fmt.Errorf("telegram: deleteWebhook: %w",
+			&tgAPIError{Code: tgResp.ErrorCode, Description: tgResp.Description})
+	}
 	return nil
 }

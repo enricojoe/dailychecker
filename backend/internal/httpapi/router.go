@@ -11,6 +11,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// RouterConfig groups optional settings for the router that come from config
+// but vary between normal operation and tests.  Zero values are safe: CORS
+// defaults to no allowed origins (preflight replies omit the header) and the
+// webhook is not registered.
+type RouterConfig struct {
+	// CORSAllowedOrigins is the list of origins permitted for CORS.
+	CORSAllowedOrigins []string
+
+	// TelegramWebhookMode signals that the webhook route should be registered
+	// instead of (and in addition to) relying on the long-poll poller.
+	// Only meaningful when tgSvc != nil.
+	TelegramWebhookMode bool
+
+	// TelegramWebhookSecret is validated in every incoming webhook request via
+	// the X-Telegram-Bot-Api-Secret-Token header. Never logged.
+	TelegramWebhookSecret string
+}
+
 // NewRouter constructs and returns the configured Gin engine with all routes
 // and middleware registered. It accepts concrete service pointers for each
 // feature domain and the JWT secret for the RequireAuth middleware.
@@ -23,9 +41,19 @@ func NewRouter(
 	occSvc *occurrences.Service,
 	tgSvc *telegram.Service,
 	jwtSecret string,
+	routerCfg RouterConfig,
 ) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery())
+
+	// jsonRecovery replaces gin.Recovery() to ensure panics produce the same
+	// {"error": "..."} JSON envelope as all other error paths. gin.Logger()
+	// provides structured request logging (method, path, status, latency)
+	// without leaking Authorization headers or tokens.
+	r.Use(gin.Logger(), jsonRecovery())
+
+	// CORS must run before auth middleware so preflight OPTIONS requests are
+	// handled without requiring a Bearer token.
+	r.Use(corsMiddleware(routerCfg.CORSAllowedOrigins))
 
 	r.GET("/healthz", healthz)
 
@@ -67,8 +95,18 @@ func NewRouter(
 
 	// Telegram — only registered when a service is wired (token present).
 	if tgSvc != nil {
-		tgh := &telegramHandler{svc: tgSvc}
+		tgh := &telegramHandler{
+			svc:           tgSvc,
+			webhookSecret: routerCfg.TelegramWebhookSecret,
+		}
+		// Protected link route is always present when telegram is enabled.
 		protected.POST("/telegram/link", tgh.link)
+
+		// Public webhook route — registered only in webhook mode.
+		// The handler validates the shared secret on every request.
+		if routerCfg.TelegramWebhookMode {
+			api.POST("/telegram/webhook", tgh.webhook)
+		}
 	}
 
 	return r

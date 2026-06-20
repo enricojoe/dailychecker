@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -24,6 +25,25 @@ type Config struct {
 	TelegramBotToken    string
 	TelegramBotUsername string
 	AppPublicURL        string
+
+	// CORS — A1 (M9)
+	// CORSAllowedOrigins is the list of origins permitted for cross-origin
+	// requests. Populated from CORS_ALLOWED_ORIGINS (comma-separated);
+	// defaults to ["http://localhost:5173"].
+	CORSAllowedOrigins []string
+
+	// Telegram webhook mode — A3 (M9)
+	// TelegramMode selects the update delivery strategy: "polling" (default)
+	// or "webhook". Ignored when TelegramBotToken is empty.
+	TelegramMode string
+	// TelegramWebhookURL is the public base URL the server is reachable at,
+	// e.g. "https://example.com". The webhook path "/api/telegram/webhook"
+	// is appended automatically. Only required when TelegramMode="webhook".
+	TelegramWebhookURL string
+	// TelegramWebhookSecret is the shared secret validated in the
+	// X-Telegram-Bot-Api-Secret-Token header on every incoming webhook
+	// delivery. Never logged.
+	TelegramWebhookSecret string
 }
 
 // Load reads configuration from envFile (if the file exists) and then from
@@ -39,6 +59,10 @@ func Load(envFile string) (*Config, error) {
 		TelegramBotToken:    os.Getenv("TELEGRAM_BOT_TOKEN"),
 		TelegramBotUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
 		AppPublicURL:        os.Getenv("APP_PUBLIC_URL"),
+		CORSAllowedOrigins:  parseCORSOrigins(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")),
+		TelegramMode:        getEnv("TELEGRAM_MODE", "polling"),
+		TelegramWebhookURL:  os.Getenv("TELEGRAM_WEBHOOK_URL"),
+		TelegramWebhookSecret: os.Getenv("TELEGRAM_WEBHOOK_SECRET"),
 	}
 
 	var err error
@@ -97,4 +121,18 @@ func parseInt(key string, fallback int) (int, error) {
 		return 0, fmt.Errorf("config: %s=%q is not a valid integer: %w", key, raw, err)
 	}
 	return v, nil
+}
+
+// parseCORSOrigins splits a comma-separated origins string, trims each entry,
+// and discards empty entries.  e.g. "http://localhost:5173,https://app.example.com"
+// → []string{"http://localhost:5173", "https://app.example.com"}.
+func parseCORSOrigins(raw string) []string {
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
 }

@@ -74,7 +74,9 @@ func TestMain(m *testing.M) {
 	}
 	tgSvc := telegram.NewService(userRepo, tgCfg, httpTestMockTgClient{})
 
-	testRouter = httpapi.NewRouter(authSvc, actSvc, occSvc, tgSvc, cfg.JWTSecret)
+	testRouter = httpapi.NewRouter(authSvc, actSvc, occSvc, tgSvc, cfg.JWTSecret, httpapi.RouterConfig{
+		CORSAllowedOrigins: []string{"http://localhost:5173"},
+	})
 
 	code := m.Run()
 	testDB.Close()

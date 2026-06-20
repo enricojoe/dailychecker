@@ -62,21 +62,36 @@ func main() {
 	occSvc := occurrences.NewService(occRepo, actRepo, loc)
 
 	// Telegram is optional: a missing bot token is not fatal — the server
-	// boots fine without it and the /api/telegram/link route is not registered.
-	// The scheduler is also only started when a Telegram client is available.
+	// boots fine without it and the Telegram routes are not registered.
 	var tgSvc *telegram.Service
 	var poller *telegram.Poller
 	var sched *scheduler.Scheduler
+
+	routerCfg := httpapi.RouterConfig{
+		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
+	}
+
 	if cfg.TelegramBotToken != "" {
 		tgClient := telegram.NewClient(cfg.TelegramBotToken, "https://api.telegram.org", nil)
 		tgSvc = telegram.NewService(userRepo, cfg, tgClient)
-		poller = telegram.NewPoller(cfg.TelegramBotToken, "https://api.telegram.org", nil, tgSvc)
 		sched = scheduler.New(occRepo, tgClient, loc, time.Now, cfg.DigestHour, cfg.AppPublicURL)
+
+		switch cfg.TelegramMode {
+		case "webhook":
+			// Webhook mode: register the route; do NOT start the poller.
+			routerCfg.TelegramWebhookMode = true
+			routerCfg.TelegramWebhookSecret = cfg.TelegramWebhookSecret
+			log.Println("telegram: webhook mode")
+		default:
+			// Polling mode (default): start the long-poll loop.
+			poller = telegram.NewPoller(cfg.TelegramBotToken, "https://api.telegram.org", nil, tgSvc)
+			log.Println("telegram: polling mode")
+		}
 	} else {
 		log.Println("telegram: disabled (TELEGRAM_BOT_TOKEN not set); scheduler not started")
 	}
 
-	router := httpapi.NewRouter(authSvc, actSvc, occSvc, tgSvc, cfg.JWTSecret)
+	router := httpapi.NewRouter(authSvc, actSvc, occSvc, tgSvc, cfg.JWTSecret, routerCfg)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -96,6 +111,22 @@ func main() {
 
 	if sched != nil {
 		sched.Start(pollerCtx)
+	}
+
+	// In webhook mode, register the webhook with Telegram on startup.
+	// A failure here is logged but does not crash the server — the endpoint
+	// will receive no traffic until the registration succeeds, but the server
+	// itself is fully operational (important in dev where there is no real token).
+	if cfg.TelegramBotToken != "" && cfg.TelegramMode == "webhook" && cfg.TelegramWebhookURL != "" {
+		webhookURL := cfg.TelegramWebhookURL + "/api/telegram/webhook"
+		tgClient := telegram.NewClient(cfg.TelegramBotToken, "https://api.telegram.org", nil)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := tgClient.SetWebhook(ctx, webhookURL, cfg.TelegramWebhookSecret); err != nil {
+			log.Printf("telegram: SetWebhook failed (server continues): %v", err)
+		} else {
+			log.Printf("telegram: webhook registered at %s", webhookURL)
+		}
 	}
 
 	go func() {

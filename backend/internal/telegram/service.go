@@ -108,6 +108,22 @@ func (s *Service) HandleStart(ctx context.Context, token string, chatID int64) e
 	return nil
 }
 
+// HandleUpdate dispatches a single Telegram Update. It is the shared dispatch
+// entry point used by both the long-poll Poller and the webhook HTTP handler,
+// so the parse+dispatch logic lives in exactly one place.
+//
+// Non-/start updates are silently ignored (returns nil). Unknown or already-
+// consumed link tokens are also silently ignored. Any DB/network error from
+// HandleStart is returned so the caller can decide how to log it.
+func (s *Service) HandleUpdate(ctx context.Context, u Update) error {
+	token := ParseStartToken(u)
+	if token == "" {
+		return nil
+	}
+	chatID := u.Message.Chat.ID
+	return s.HandleStart(ctx, token, chatID)
+}
+
 // generateToken returns a 32-byte cryptographically random hex string (64 chars).
 func generateToken() (string, error) {
 	b := make([]byte, 32)

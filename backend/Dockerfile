@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1
+
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+
+# Cache modules first for faster rebuilds.
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+# Static binary so it runs on a minimal base.
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server ./cmd/server
+
+# ── Runtime stage ────────────────────────────────────────────────────────────
+FROM alpine:3.20 AS runtime
+WORKDIR /app
+
+# ca-certificates: HTTPS calls to the Telegram Bot API.
+# tzdata: the app loads the Asia/Jakarta location at startup.
+RUN apk add --no-cache ca-certificates tzdata \
+    && adduser -D -u 10001 appuser
+
+COPY --from=build /out/server /app/server
+# main.go resolves migrations relative to the working directory.
+COPY --from=build /src/migrations /app/migrations
+
+USER appuser
+EXPOSE 8080
+# PORT, DATABASE_URL, JWT_SECRET, etc. are supplied via the environment.
+CMD ["/app/server"]

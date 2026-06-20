@@ -69,13 +69,8 @@ func (p *Poller) Run(ctx context.Context) {
 			if u.UpdateID >= offset {
 				offset = u.UpdateID + 1
 			}
-			token := ParseStartToken(u)
-			if token == "" {
-				continue
-			}
-			chatID := u.Message.Chat.ID
-			if err := p.svc.HandleStart(ctx, token, chatID); err != nil {
-				log.Printf("telegram poller: HandleStart(chat=%d): %v", chatID, err)
+			if err := p.svc.HandleUpdate(ctx, u); err != nil {
+				log.Printf("telegram poller: HandleUpdate(update=%d): %v", u.UpdateID, err)
 			}
 		}
 	}

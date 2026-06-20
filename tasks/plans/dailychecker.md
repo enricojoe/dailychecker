@@ -3,7 +3,8 @@
 > A multi-user daily activity tracker with nested sub-activities, per-activity
 > scheduling, completion history, and Telegram reminders.
 >
-> **Status:** Planning complete — ready to start Milestone 0.
+> **Status:** ✅ All milestones M0–M9 complete & verified (2026-06-20). One manual
+> step remains: live Telegram DM verification (needs a real BotFather token).
 > Update the checkboxes and the "Result" notes as each milestone is delivered.
 
 ---
@@ -256,12 +257,12 @@ Done** is met and verified, then fill in the Result note.
 - **Result:** _2026-06-20_ — Completed & verified (see [m8-frontend-features.md](m8-frontend-features.md)). Feature folders `activities/`, `today/`, `history/`, `telegram/`, each with `api.ts` + TanStack Query hooks + components. Activities: tree list, create/edit with schedule editor (freq daily/weekly toggle, weekday multiselect only when weekly, time/notes/active/sort), add-sub-activity only on top-level (single-level depth in UI), delete-with-confirm, invalidates today+activities. Today: occurrence tree, expand/collapse, tri-state control (pending→partial→done cycle); `useSetOccurrenceState` does optimistic single-node update then **reconciles with the authoritative group tree returned by PATCH** (rollup), rollback+invalidate on error. History: calendar month grid (per-day DaySummary, prev/next, click day → read-only detail tree) + by-activity timeline. Telegram: Connected state from `user.telegram_chat_id`, else Connect button → `POST /api/telegram/link` deep-link, gracefully handles 404 (no bot token). Routes `/activities` `/history` `/telegram` wired under AppShell + nav links enabled. **Orchestrator fixes after subagent hit its session limit (no toolchain access):** fixed an unescaped apostrophe in TodayPage JSX (broke `tsc -b` build), removed orphaned `TodayPlaceholder`. tsc/build/lint clean. **Live E2E verified by orchestrator** against the running backend: create daily parent + 2 children → `GET /api/today` tree → PATCH child1 done ⇒ parent `partial` → PATCH child2 done ⇒ parent `done` (rollup) → calendar summary `{done:3,total:3}` + calendar/:date tree + by-activity timeline all correct → weekly-without-days 422 → telegram/link 404 (token-less) handled.
 
 ### Milestone 9 — Hardening, Docs & Deployment
-- [ ] Input validation, consistent error responses, request logging
-- [ ] Switch Telegram to webhook for prod (documented); secrets via env
-- [ ] README: setup, env vars, bot creation, running locally
-- [ ] Optional: Dockerfiles for backend/frontend; basic CI (build + test)
-- **DoD:** Fresh clone → follow README → working app locally; tests green in CI.
-- **Result:** _TBD_
+- [x] Input validation, consistent error responses, request logging
+- [x] Switch Telegram to webhook for prod (fully implemented, env-selectable); secrets via env
+- [x] README: setup, env vars, bot creation, running locally
+- [x] Dockerfiles for backend/frontend (CI skipped per user decision)
+- **DoD:** Fresh clone → follow README → working app locally; tests green. _(CI out of scope by choice.)_
+- **Result:** _2026-06-20_ — Completed & verified (see [m9-hardening-docs-deploy.md](m9-hardening-docs-deploy.md)). **Part A (backend, subagent):** hand-rolled CORS middleware (config `CORS_ALLOWED_ORIGINS`, default :5173; never `*`+credentials); `jsonRecovery` middleware so panics emit the `{error}` 500 envelope; logging audited (no Authorization/tokens/secrets logged). Telegram **webhook mode** fully implemented: new `TELEGRAM_MODE` (polling default | webhook), `TELEGRAM_WEBHOOK_URL`, `TELEGRAM_WEBHOOK_SECRET`; public `POST /api/telegram/webhook` (registered only in webhook mode) validates `X-Telegram-Bot-Api-Secret-Token`, always 200s; shared dispatch refactored to `Service.HandleUpdate` (poller + webhook reuse it, zero dup); client gained `SetWebhook`/`DeleteWebhook`; `main.go` selects disabled/polling/webhook, `setWebhook` failure is non-fatal. 12 new tests (CORS, webhook, setWebhook). **Part B (infra, orchestrator):** multi-stage `backend/Dockerfile` (static binary on alpine + tzdata + ca-certs, copies migrations, non-root) and `frontend/Dockerfile` (node build → nginx with SPA fallback); `.dockerignore`s; full-stack `docker-compose` behind a `full` profile so plain `up`/`make db-up` stays db-only; `make docker-build|up|down`. **Part C (docs, orchestrator):** root `README.md` (overview, architecture, local + Docker setup, full env reference, BotFather + polling/webhook guide, tests); `.env.example` updated. **Verification (orchestrator):** `go build`/`vet` clean, 2× parallel `go test ./...` green; backend boots in all 3 telegram modes (webhook setWebhook failure on fake token doesn't crash); live CORS preflight returns correct ACAO; both Docker images build; **full stack via `make docker-up` smoke-tested end-to-end** (register 201 → login 200 → CORS allows :8081 → frontend serves). (Debugging note: orphaned dev servers were squatting host :8080 — see [workflow lesson](workflow.md).)
 
 ---
 
