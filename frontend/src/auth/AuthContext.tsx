@@ -25,8 +25,8 @@ interface AuthContextValue {
   isAuthenticated: boolean
   /** True only while a token exists but the /me fetch hasn't resolved yet. */
   isLoading: boolean
-  login: (phone: string, password: string) => Promise<void>
-  register: (name: string, phone: string, password: string) => Promise<void>
+  login: (username: string, password: string) => Promise<void>
+  register: (name: string, username: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Auth actions ───────────────────────────────────────────────────────────
 
-  const login = async (phone: string, password: string): Promise<void> => {
-    const { access, refresh } = await authApi.login(phone, password)
+  const login = async (username: string, password: string): Promise<void> => {
+    const { access, refresh } = await authApi.login(username, password)
     tokenStore.set(access, refresh)
     setHasToken(true)
     // Mark /me stale so it refetches after enabled flips to true.
@@ -63,12 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (
     name: string,
-    phone: string,
+    username: string,
     password: string
   ): Promise<void> => {
-    await authApi.register({ name, phone, password })
+    await authApi.register({ name, username, password })
     // Auto-login: registration doesn't return tokens, so follow up with login.
-    const { access, refresh } = await authApi.login(phone, password)
+    const { access, refresh } = await authApi.login(username, password)
     tokenStore.set(access, refresh)
     setHasToken(true)
     void queryClient.invalidateQueries({ queryKey: ['me'] })

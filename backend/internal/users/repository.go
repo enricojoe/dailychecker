@@ -18,15 +18,15 @@ import (
 var (
 	// ErrNotFound is returned when a query matches no rows.
 	ErrNotFound = errors.New("users: not found")
-	// ErrConflict is returned when a unique constraint is violated (duplicate phone).
-	ErrConflict = errors.New("users: phone already registered")
+	// ErrConflict is returned when a unique constraint is violated (duplicate username).
+	ErrConflict = errors.New("users: username already registered")
 )
 
 // User represents a row in the users table.
 type User struct {
 	ID                string     `db:"id"                   json:"id"`
 	Name              string     `db:"name"                 json:"name"`
-	Phone             string     `db:"phone"                json:"phone"`
+	Username          string     `db:"username"             json:"username"`
 	PasswordHash      string     `db:"password_hash"        json:"-"`
 	TelegramChatID    *int64     `db:"telegram_chat_id"     json:"telegram_chat_id,omitempty"`
 	TelegramLinkToken *string    `db:"telegram_link_token"  json:"-"`
@@ -38,16 +38,16 @@ type User struct {
 // Repository is the data-access contract consumed by the service layer.
 // Defined here (in the consumer package) so dependencies point inward.
 type Repository interface {
-	// Create inserts a new user. The Name, Phone, and PasswordHash fields must
-	// be populated; ID, CreatedAt, and UpdatedAt are set by the database and
-	// written back into u on success.
+	// Create inserts a new user. The Name, Username, and PasswordHash fields
+	// must be populated; ID, CreatedAt, and UpdatedAt are set by the database
+	// and written back into u on success.
 	Create(ctx context.Context, u *User) error
 
 	// GetByID returns the user with the given UUID, or ErrNotFound.
 	GetByID(ctx context.Context, id string) (*User, error)
 
-	// GetByPhone returns the user with the given phone number, or ErrNotFound.
-	GetByPhone(ctx context.Context, phone string) (*User, error)
+	// GetByUsername returns the user with the given username, or ErrNotFound.
+	GetByUsername(ctx context.Context, username string) (*User, error)
 
 	// GetByLinkToken returns the user whose telegram_link_token matches token,
 	// or ErrNotFound when no row matches. Used during the Telegram deep-link
@@ -71,8 +71,8 @@ func NewRepository(db *sqlx.DB) Repository {
 
 func (r *sqlxRepository) Create(ctx context.Context, u *User) error {
 	const q = `
-		INSERT INTO users (name, phone, password_hash)
-		VALUES (:name, :phone, :password_hash)
+		INSERT INTO users (name, username, password_hash)
+		VALUES (:name, :username, :password_hash)
 		RETURNING id, created_at, updated_at`
 
 	stmt, args, err := sqlx.Named(q, u)
@@ -92,8 +92,14 @@ func (r *sqlxRepository) Create(ctx context.Context, u *User) error {
 }
 
 func (r *sqlxRepository) GetByID(ctx context.Context, id string) (*User, error) {
+	const q = `
+		SELECT id, name, username, password_hash,
+		       telegram_chat_id, telegram_link_token, telegram_linked_at,
+		       created_at, updated_at
+		FROM users
+		WHERE id = $1`
 	var u User
-	if err := r.db.GetContext(ctx, &u, `SELECT * FROM users WHERE id = $1`, id); err != nil {
+	if err := r.db.GetContext(ctx, &u, q, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -102,20 +108,26 @@ func (r *sqlxRepository) GetByID(ctx context.Context, id string) (*User, error) 
 	return &u, nil
 }
 
-func (r *sqlxRepository) GetByPhone(ctx context.Context, phone string) (*User, error) {
+func (r *sqlxRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
+	const q = `
+		SELECT id, name, username, password_hash,
+		       telegram_chat_id, telegram_link_token, telegram_linked_at,
+		       created_at, updated_at
+		FROM users
+		WHERE username = $1`
 	var u User
-	if err := r.db.GetContext(ctx, &u, `SELECT * FROM users WHERE phone = $1`, phone); err != nil {
+	if err := r.db.GetContext(ctx, &u, q, username); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, fmt.Errorf("users: get by phone: %w", err)
+		return nil, fmt.Errorf("users: get by username: %w", err)
 	}
 	return &u, nil
 }
 
 func (r *sqlxRepository) GetByLinkToken(ctx context.Context, token string) (*User, error) {
 	const q = `
-		SELECT id, name, phone, password_hash,
+		SELECT id, name, username, password_hash,
 		       telegram_chat_id, telegram_link_token, telegram_linked_at,
 		       created_at, updated_at
 		FROM users

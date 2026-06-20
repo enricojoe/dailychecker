@@ -34,8 +34,7 @@ func TestTokenRepository(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a throw-away user to satisfy the refresh_tokens.user_id FK.
-	phone := fmt.Sprintf("+1555%09d", time.Now().UnixNano()%1_000_000_000)
-	owner := &users.User{Name: "Token Owner", Phone: phone, PasswordHash: "hash"}
+	owner := &users.User{Name: "Token Owner", Username: fmt.Sprintf("tokenowner_%d", time.Now().UnixNano()), PasswordHash: "hash"}
 	if err := userRepo.Create(ctx, owner); err != nil {
 		t.Fatalf("setup create user: %v", err)
 	}

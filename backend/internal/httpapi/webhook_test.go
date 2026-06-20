@@ -136,10 +136,9 @@ func TestWebhook_ValidStartToken(t *testing.T) {
 	repo := users.NewRepository(testDB)
 	ctx := context.Background()
 
-	phone := fmt.Sprintf("+1777%09d", time.Now().UnixNano()%1_000_000_000)
 	u := &users.User{
 		Name:         "WebhookTestUser",
-		Phone:        phone,
+		Username:     fmt.Sprintf("webhookuser_%d", time.Now().UnixNano()),
 		PasswordHash: "$2a$12$placeholder",
 	}
 	if err := repo.Create(ctx, u); err != nil {

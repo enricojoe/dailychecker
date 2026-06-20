@@ -1,6 +1,6 @@
 /**
  * Public login page.
- * - Client validation: phone required, password ≥ 8 chars.
+ * - Client validation: username required (min 3 chars), password ≥ 8 chars.
  * - Surfaces backend error messages (401 "invalid credentials", etc.).
  * - Authenticated users are redirected to / immediately.
  */
@@ -18,9 +18,9 @@ export function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
 
-  const [phone, setPhone] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [fieldError, setFieldError] = useState<{ phone?: string; password?: string }>({})
+  const [fieldError, setFieldError] = useState<{ username?: string; password?: string }>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -30,8 +30,8 @@ export function LoginPage() {
   if (isAuthenticated) return <Navigate to="/" replace />
 
   function validate(): boolean {
-    const errors: { phone?: string; password?: string } = {}
-    if (!phone.trim()) errors.phone = 'Phone number is required.'
+    const errors: { username?: string; password?: string } = {}
+    if (username.trim().length < 3) errors.username = 'Username must be at least 3 characters.'
     if (password.length < 8) errors.password = 'Password must be at least 8 characters.'
     setFieldError(errors)
     return Object.keys(errors).length === 0
@@ -44,7 +44,7 @@ export function LoginPage() {
     try {
       setIsSubmitting(true)
       setServerError(null)
-      await login(phone, password)
+      await login(username, password)
       navigate('/')
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -68,23 +68,23 @@ export function LoginPage() {
           </div>
 
           <form onSubmit={(e) => void handleSubmit(e)} noValidate className="space-y-4">
-            {/* Phone */}
+            {/* Username */}
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone number</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="phone"
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                aria-describedby={fieldError.phone ? 'phone-error' : undefined}
-                aria-invalid={!!fieldError.phone}
+                id="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                aria-describedby={fieldError.username ? 'username-error' : undefined}
+                aria-invalid={!!fieldError.username}
                 disabled={isSubmitting}
-                placeholder="+1 555 000 0000"
+                placeholder="your_username"
               />
-              {fieldError.phone && (
-                <p id="phone-error" role="alert" className="text-xs text-destructive">
-                  {fieldError.phone}
+              {fieldError.username && (
+                <p id="username-error" role="alert" className="text-xs text-destructive">
+                  {fieldError.username}
                 </p>
               )}
             </div>

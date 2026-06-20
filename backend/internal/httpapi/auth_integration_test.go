@@ -85,9 +85,9 @@ func TestMain(m *testing.M) {
 
 // --- helpers ----------------------------------------------------------------
 
-// uniquePhone returns a phone number that is unique within a test run.
-func uniquePhone() string {
-	return fmt.Sprintf("+1555%09d", time.Now().UnixNano()%1_000_000_000)
+// uniqueUsername returns a username that is unique within a test run.
+func uniqueUsername() string {
+	return fmt.Sprintf("user%d", time.Now().UnixNano())
 }
 
 // doReq fires a request against testRouter and returns the recorder.
@@ -170,19 +170,19 @@ func TestHealthz(t *testing.T) {
 // TestFullAuthCycle covers the complete happy path:
 // register → login → /me → refresh (rotation) → /me with new token → logout → logout again.
 func TestFullAuthCycle(t *testing.T) {
-	phone := uniquePhone()
+	username := uniqueUsername()
 	const password = "TestPass123!"
 
 	// 1. Register.
 	w := post(t, "/api/auth/register", map[string]interface{}{
-		"name": "Cycle User", "phone": phone, "password": password,
+		"name": "Cycle User", "username": username, "password": password,
 	}, nil)
 	assertStatus(t, w, http.StatusCreated)
 
 	var regBody struct {
-		ID    string `json:"id"`
-		Name  string `json:"name"`
-		Phone string `json:"phone"`
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Username string `json:"username"`
 	}
 	decodeJSON(t, w, &regBody)
 	if regBody.ID == "" {
@@ -191,10 +191,13 @@ func TestFullAuthCycle(t *testing.T) {
 	if regBody.Name != "Cycle User" {
 		t.Errorf("register: name want %q got %q", "Cycle User", regBody.Name)
 	}
+	if regBody.Username != username {
+		t.Errorf("register: username want %q got %q", username, regBody.Username)
+	}
 
 	// 2. Login.
 	w = post(t, "/api/auth/login", map[string]interface{}{
-		"phone": phone, "password": password,
+		"username": username, "password": password,
 	}, nil)
 	assertStatus(t, w, http.StatusOK)
 	access1, refresh1 := tokenPairFrom(t, w)
@@ -203,12 +206,15 @@ func TestFullAuthCycle(t *testing.T) {
 	w = get(t, "/api/me", bearer(access1))
 	assertStatus(t, w, http.StatusOK)
 	var meBody struct {
-		ID    string `json:"id"`
-		Phone string `json:"phone"`
+		ID       string `json:"id"`
+		Username string `json:"username"`
 	}
 	decodeJSON(t, w, &meBody)
 	if meBody.ID != regBody.ID {
 		t.Errorf("/me: id mismatch: want %q got %q", regBody.ID, meBody.ID)
+	}
+	if meBody.Username != username {
+		t.Errorf("/me: username mismatch: want %q got %q", username, meBody.Username)
 	}
 
 	// 4. Refresh — produces a new token pair and rotates the old refresh token.
@@ -241,11 +247,11 @@ func TestFullAuthCycle(t *testing.T) {
 	assertStatus(t, w, http.StatusUnauthorized)
 }
 
-// TestRegisterDuplicate verifies that registering the same phone twice returns 409.
+// TestRegisterDuplicate verifies that registering the same username twice returns 409.
 func TestRegisterDuplicate(t *testing.T) {
-	phone := uniquePhone()
+	username := uniqueUsername()
 	body := map[string]interface{}{
-		"name": "Dup User", "phone": phone, "password": "password123",
+		"name": "Dup User", "username": username, "password": "password123",
 	}
 	w := post(t, "/api/auth/register", body, nil)
 	assertStatus(t, w, http.StatusCreated)
@@ -260,9 +266,11 @@ func TestRegisterValidation(t *testing.T) {
 		name string
 		body map[string]interface{}
 	}{
-		{"missing name", map[string]interface{}{"phone": "+155500001111", "password": "password123"}},
-		{"missing phone", map[string]interface{}{"name": "X", "password": "password123"}},
-		{"password too short", map[string]interface{}{"name": "X", "phone": "+155500001111", "password": "short"}},
+		{"missing name", map[string]interface{}{"username": "validuser", "password": "password123"}},
+		{"missing username", map[string]interface{}{"name": "X", "password": "password123"}},
+		{"username too short", map[string]interface{}{"name": "X", "username": "ab", "password": "password123"}},
+		{"username too long", map[string]interface{}{"name": "X", "username": "averylongusernamethatexceedsthirtychars", "password": "password123"}},
+		{"password too short", map[string]interface{}{"name": "X", "username": "validuser", "password": "short"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -272,22 +280,22 @@ func TestRegisterValidation(t *testing.T) {
 	}
 }
 
-// TestLoginWrongCredentials covers bad password and unknown phone → both 401.
+// TestLoginWrongCredentials covers bad password and unknown username → both 401.
 func TestLoginWrongCredentials(t *testing.T) {
-	phone := uniquePhone()
+	username := uniqueUsername()
 	post(t, "/api/auth/register", map[string]interface{}{
-		"name": "Login Test", "phone": phone, "password": "correct-password",
+		"name": "Login Test", "username": username, "password": "correct-password",
 	}, nil)
 
 	t.Run("wrong password", func(t *testing.T) {
 		w := post(t, "/api/auth/login", map[string]interface{}{
-			"phone": phone, "password": "wrong-password",
+			"username": username, "password": "wrong-password",
 		}, nil)
 		assertStatus(t, w, http.StatusUnauthorized)
 	})
-	t.Run("unknown phone", func(t *testing.T) {
+	t.Run("unknown username", func(t *testing.T) {
 		w := post(t, "/api/auth/login", map[string]interface{}{
-			"phone": "+99000000000", "password": "correct-password",
+			"username": "doesnotexist_xyz", "password": "correct-password",
 		}, nil)
 		assertStatus(t, w, http.StatusUnauthorized)
 	})
@@ -349,12 +357,12 @@ func TestRefreshNegative(t *testing.T) {
 
 	t.Run("revoked token", func(t *testing.T) {
 		// Register + login to get a real refresh token, then revoke it via logout.
-		phone := uniquePhone()
+		username := uniqueUsername()
 		post(t, "/api/auth/register", map[string]interface{}{
-			"name": "Revoke Test", "phone": phone, "password": "password123",
+			"name": "Revoke Test", "username": username, "password": "password123",
 		}, nil)
 		w := post(t, "/api/auth/login", map[string]interface{}{
-			"phone": phone, "password": "password123",
+			"username": username, "password": "password123",
 		}, nil)
 		assertStatus(t, w, http.StatusOK)
 		_, refresh := tokenPairFrom(t, w)

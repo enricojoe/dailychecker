@@ -30,12 +30,12 @@ func TestUserRepository(t *testing.T) {
 	repo := users.NewRepository(testDB)
 	ctx := context.Background()
 
-	// Unique phone per test run to avoid cross-run conflicts.
-	phone := fmt.Sprintf("+1555%09d", time.Now().UnixNano()%1_000_000_000)
+	// Unique username per test run to avoid cross-run conflicts.
+	username := fmt.Sprintf("alice_%d", time.Now().UnixNano())
 
 	u := &users.User{
 		Name:         "Alice",
-		Phone:        phone,
+		Username:     username,
 		PasswordHash: "$2a$12$placeholder",
 	}
 	if err := repo.Create(ctx, u); err != nil {
@@ -53,11 +53,11 @@ func TestUserRepository(t *testing.T) {
 		testDB.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, u.ID)
 	})
 
-	t.Run("DuplicatePhone", func(t *testing.T) {
-		dup := &users.User{Name: "Bob", Phone: phone, PasswordHash: "x"}
+	t.Run("DuplicateUsername", func(t *testing.T) {
+		dup := &users.User{Name: "Bob", Username: username, PasswordHash: "x"}
 		err := repo.Create(ctx, dup)
 		if err != users.ErrConflict {
-			t.Fatalf("duplicate phone: want ErrConflict, got %v", err)
+			t.Fatalf("duplicate username: want ErrConflict, got %v", err)
 		}
 	})
 
@@ -66,8 +66,8 @@ func TestUserRepository(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetByID: %v", err)
 		}
-		if got.Phone != phone {
-			t.Errorf("phone: want %q, got %q", phone, got.Phone)
+		if got.Username != username {
+			t.Errorf("username: want %q, got %q", username, got.Username)
 		}
 	})
 
@@ -78,18 +78,18 @@ func TestUserRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("GetByPhone", func(t *testing.T) {
-		got, err := repo.GetByPhone(ctx, phone)
+	t.Run("GetByUsername", func(t *testing.T) {
+		got, err := repo.GetByUsername(ctx, username)
 		if err != nil {
-			t.Fatalf("GetByPhone: %v", err)
+			t.Fatalf("GetByUsername: %v", err)
 		}
 		if got.ID != u.ID {
 			t.Errorf("ID: want %q, got %q", u.ID, got.ID)
 		}
 	})
 
-	t.Run("GetByPhoneNotFound", func(t *testing.T) {
-		_, err := repo.GetByPhone(ctx, "+10000000000")
+	t.Run("GetByUsernameNotFound", func(t *testing.T) {
+		_, err := repo.GetByUsername(ctx, "nonexistent_user_xyz")
 		if err != users.ErrNotFound {
 			t.Fatalf("want ErrNotFound, got %v", err)
 		}

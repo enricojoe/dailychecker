@@ -23,7 +23,7 @@ func respondError(c *gin.Context, err error) {
 	switch {
 	// Auth errors.
 	case errors.Is(err, users.ErrConflict):
-		c.JSON(http.StatusConflict, errResponse{Error: "phone already registered"})
+		c.JSON(http.StatusConflict, errResponse{Error: "username already registered"})
 	case errors.Is(err, auth.ErrInvalidCredentials):
 		c.JSON(http.StatusUnauthorized, errResponse{Error: "invalid credentials"})
 	case errors.Is(err, auth.ErrTokenInvalid):

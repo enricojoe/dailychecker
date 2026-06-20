@@ -10,7 +10,7 @@ import { apiClient } from '@/api/apiClient'
 export interface UserDto {
   id: string
   name: string
-  phone: string
+  username: string
   telegram_chat_id?: number
   telegram_linked_at?: string
   created_at: string
@@ -24,7 +24,7 @@ export interface TokenPair {
 
 export interface RegisterDto {
   name: string
-  phone: string
+  username: string
   password: string
 }
 
@@ -34,8 +34,8 @@ export const authApi = {
   register: (dto: RegisterDto) =>
     apiClient.post<UserDto>('/auth/register', dto),
 
-  login: (phone: string, password: string) =>
-    apiClient.post<TokenPair>('/auth/login', { phone, password }),
+  login: (username: string, password: string) =>
+    apiClient.post<TokenPair>('/auth/login', { username, password }),
 
   logout: (refresh: string) =>
     apiClient.post<void>('/auth/logout', { refresh }),

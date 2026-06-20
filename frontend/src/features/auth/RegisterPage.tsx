@@ -1,7 +1,7 @@
 /**
  * Public registration page.
- * - Client validation: name required, phone required, password ≥ 8 chars.
- * - Surfaces backend errors: 409 "phone already taken", 422 validation.
+ * - Client validation: name required, username required (min 3 chars), password ≥ 8 chars.
+ * - Surfaces backend errors: 409 "username already taken", 422 validation.
  * - On success: auto-logs in and navigates to /.
  * - Authenticated users are redirected to / immediately.
  */
@@ -20,11 +20,11 @@ export function RegisterPage() {
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [fieldError, setFieldError] = useState<{
     name?: string
-    phone?: string
+    username?: string
     password?: string
   }>({})
   const [serverError, setServerError] = useState<string | null>(null)
@@ -34,9 +34,9 @@ export function RegisterPage() {
   if (isAuthenticated) return <Navigate to="/" replace />
 
   function validate(): boolean {
-    const errors: { name?: string; phone?: string; password?: string } = {}
+    const errors: { name?: string; username?: string; password?: string } = {}
     if (!name.trim()) errors.name = 'Name is required.'
-    if (!phone.trim()) errors.phone = 'Phone number is required.'
+    if (username.trim().length < 3) errors.username = 'Username must be at least 3 characters.'
     if (password.length < 8)
       errors.password = 'Password must be at least 8 characters.'
     setFieldError(errors)
@@ -50,7 +50,7 @@ export function RegisterPage() {
     try {
       setIsSubmitting(true)
       setServerError(null)
-      await register(name.trim(), phone.trim(), password)
+      await register(name.trim(), username.trim(), password)
       navigate('/')
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -95,23 +95,23 @@ export function RegisterPage() {
               )}
             </div>
 
-            {/* Phone */}
+            {/* Username */}
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone number</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="phone"
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                aria-describedby={fieldError.phone ? 'phone-error' : undefined}
-                aria-invalid={!!fieldError.phone}
+                id="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                aria-describedby={fieldError.username ? 'username-error' : undefined}
+                aria-invalid={!!fieldError.username}
                 disabled={isSubmitting}
-                placeholder="+1 555 000 0000"
+                placeholder="your_username"
               />
-              {fieldError.phone && (
-                <p id="phone-error" role="alert" className="text-xs text-destructive">
-                  {fieldError.phone}
+              {fieldError.username && (
+                <p id="username-error" role="alert" className="text-xs text-destructive">
+                  {fieldError.username}
                 </p>
               )}
             </div>

@@ -18,12 +18,12 @@ func TestTelegramLink_Unauthed(t *testing.T) {
 // response containing a non-empty URL and token.
 func TestTelegramLink_Authed(t *testing.T) {
 	// Register + login to get an access token.
-	phone := uniquePhone()
+	username := uniqueUsername()
 	post(t, "/api/auth/register", map[string]interface{}{
-		"name": "TG Link User", "phone": phone, "password": "password123",
+		"name": "TG Link User", "username": username, "password": "password123",
 	}, nil)
 	w := post(t, "/api/auth/login", map[string]interface{}{
-		"phone": phone, "password": "password123",
+		"username": username, "password": "password123",
 	}, nil)
 	assertStatus(t, w, http.StatusOK)
 	access, _ := tokenPairFrom(t, w)
@@ -55,19 +55,19 @@ func TestTelegramLink_Authed(t *testing.T) {
 // TestTelegramLink_ReissueReplacesToken verifies that calling the endpoint
 // twice returns different tokens (re-issue replaces the old one).
 func TestTelegramLink_ReissueReplacesToken(t *testing.T) {
-	phone := uniquePhone()
+	username := uniqueUsername()
 	post(t, "/api/auth/register", map[string]interface{}{
-		"name": "TG Reissue", "phone": phone, "password": "password123",
+		"name": "TG Reissue", "username": username, "password": "password123",
 	}, nil)
 	w := post(t, "/api/auth/login", map[string]interface{}{
-		"phone": phone, "password": "password123",
+		"username": username, "password": "password123",
 	}, nil)
 	access, _ := tokenPairFrom(t, w)
 
 	w1 := post(t, "/api/telegram/link", nil, bearer(access))
 	assertStatus(t, w1, http.StatusOK)
 
-	// Small sleep to avoid identical UnixNano-based phones on fast hardware.
+	// Small sleep to avoid identical UnixNano-based usernames on fast hardware.
 	time.Sleep(time.Millisecond)
 
 	w2 := post(t, "/api/telegram/link", nil, bearer(access))

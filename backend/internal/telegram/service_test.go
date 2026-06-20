@@ -62,10 +62,9 @@ func newTestConfig() *config.Config {
 func createUser(t *testing.T, repo users.Repository) *users.User {
 	t.Helper()
 	ctx := context.Background()
-	phone := fmt.Sprintf("+1555%012d", time.Now().UnixNano()%1_000_000_000_000)
 	u := &users.User{
 		Name:         "TelegramTestUser",
-		Phone:        phone,
+		Username:     fmt.Sprintf("tguser_%d", time.Now().UnixNano()),
 		PasswordHash: "$2a$12$placeholder",
 	}
 	if err := repo.Create(ctx, u); err != nil {

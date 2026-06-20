@@ -29,8 +29,7 @@ func TestGenerateForDateWeeklyDueLogic(t *testing.T) {
 	svc := occurrences.NewService(occRepo, actRepo, time.UTC)
 	ctx := context.Background()
 
-	phone := fmt.Sprintf("+1556%09d", time.Now().UnixNano()%1_000_000_000)
-	owner := &users.User{Name: "Weekly Owner", Phone: phone, PasswordHash: "hash"}
+	owner := &users.User{Name: "Weekly Owner", Username: fmt.Sprintf("weeklyowner_%d", time.Now().UnixNano()), PasswordHash: "hash"}
 	if err := userRepo.Create(ctx, owner); err != nil {
 		t.Fatalf("setup create user: %v", err)
 	}

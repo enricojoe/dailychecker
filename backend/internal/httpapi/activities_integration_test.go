@@ -29,11 +29,11 @@ func delReq(t *testing.T, path string, headers map[string]string) *http.Response
 // setupUser registers a new user, logs in, and returns the access token.
 func setupUser(t *testing.T) (userID, accessToken string) {
 	t.Helper()
-	phone := fmt.Sprintf("+62800%09d", time.Now().UnixNano()%1_000_000_000)
+	username := fmt.Sprintf("actuser%d", time.Now().UnixNano())
 	const password = "Password123!"
 
 	w := post(t, "/api/auth/register", map[string]interface{}{
-		"name": "Test User", "phone": phone, "password": password,
+		"name": "Test User", "username": username, "password": password,
 	}, nil)
 	assertStatus(t, w, http.StatusCreated)
 	var regBody struct {
@@ -43,7 +43,7 @@ func setupUser(t *testing.T) (userID, accessToken string) {
 	userID = regBody.ID
 
 	w = post(t, "/api/auth/login", map[string]interface{}{
-		"phone": phone, "password": password,
+		"username": username, "password": password,
 	}, nil)
 	assertStatus(t, w, http.StatusOK)
 	access, _ := tokenPairFrom(t, w)

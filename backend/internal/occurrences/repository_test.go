@@ -37,8 +37,7 @@ func TestOccurrenceRepository(t *testing.T) {
 	ctx := context.Background()
 
 	// --- Shared fixtures: user + activity ---
-	phone := fmt.Sprintf("+1555%09d", time.Now().UnixNano()%1_000_000_000)
-	owner := &users.User{Name: "Occ Owner", Phone: phone, PasswordHash: "hash"}
+	owner := &users.User{Name: "Occ Owner", Username: fmt.Sprintf("occowner_%d", time.Now().UnixNano()), PasswordHash: "hash"}
 	if err := userRepo.Create(ctx, owner); err != nil {
 		t.Fatalf("setup create user: %v", err)
 	}

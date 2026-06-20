@@ -25,7 +25,7 @@ activity's time, plus a nightly catch-all digest of everything still not done.
 | Backend | Go + Gin + sqlx |
 | Database | PostgreSQL |
 | Frontend | React + Vite + TypeScript, TanStack Query, Tailwind + shadcn/ui |
-| Auth | name + phone + password (bcrypt); JWT access token + DB-stored refresh token |
+| Auth | name + username + password (bcrypt); JWT access token + DB-stored refresh token. _(Originally phone; replaced with username post-M9 — login identifier is `username`, unique, 3–30 chars.)_ |
 | Timezone | Asia/Jakarta (GMT+7), global for all users (v1) |
 | Item states | `pending` \| `partial` \| `done` |
 | Parent/child | All children `done` → parent auto `done`; parent manually `done` → all children `done`; `partial` settable manually on any item |
@@ -109,7 +109,7 @@ frontend/
 > Final column types/constraints refined during Milestone 1. IDs use `uuid`.
 
 **users**
-- `id`, `name`, `phone` (unique), `password_hash`
+- `id`, `name`, `username` (unique), `password_hash` _(was `phone`; changed in migration 000005)_
 - `telegram_chat_id` (nullable), `telegram_link_token` (nullable, for deep-link), `telegram_linked_at`
 - `created_at`, `updated_at`
 
@@ -143,8 +143,8 @@ frontend/
 ## 4. API Surface (draft)
 
 ```
-POST   /api/auth/register          { name, phone, password }
-POST   /api/auth/login             { phone, password } -> { access, refresh }
+POST   /api/auth/register          { name, username, password }
+POST   /api/auth/login             { username, password } -> { access, refresh }
 POST   /api/auth/refresh           { refresh } -> { access, refresh }
 POST   /api/auth/logout            (revokes refresh)
 GET    /api/me

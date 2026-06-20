@@ -80,10 +80,10 @@ func init() {
 	}
 }
 
-// uniquePhone generates a unique phone number to avoid conflicts between
+// uniqueUsername generates a unique username to avoid conflicts between
 // parallel test cases. Each test creates its own user so they don't interfere.
-func uniquePhone(suffix string) string {
-	return fmt.Sprintf("+9%09d%s", time.Now().UnixNano()%1_000_000_000, suffix)
+func uniqueUsername(suffix string) string {
+	return fmt.Sprintf("sched_%d_%s", time.Now().UnixNano(), suffix)
 }
 
 // fixture holds all created objects for a single test scenario.
@@ -117,7 +117,7 @@ func createFixture(
 
 	u := &users.User{
 		Name:         "SchedTest " + t.Name(),
-		Phone:        uniquePhone(fmt.Sprintf("%d", chatID)),
+		Username:     uniqueUsername(fmt.Sprintf("%d", chatID)),
 		PasswordHash: "hash",
 	}
 	if err := userRepo.Create(ctx, u); err != nil {

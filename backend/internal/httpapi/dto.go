@@ -61,13 +61,13 @@ type PatchActivityRequest struct {
 // RegisterRequest is the JSON body for POST /api/auth/register.
 type RegisterRequest struct {
 	Name     string `json:"name"     binding:"required,min=1,max=100"`
-	Phone    string `json:"phone"    binding:"required,min=5,max=20"`
+	Username string `json:"username" binding:"required,min=3,max=30"`
 	Password string `json:"password" binding:"required,min=8"`
 }
 
 // LoginRequest is the JSON body for POST /api/auth/login.
 type LoginRequest struct {
-	Phone    string `json:"phone"    binding:"required"`
+	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 

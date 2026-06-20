@@ -13,7 +13,7 @@ import (
 // Service-level sentinel errors. Handlers use errors.Is to map these to HTTP
 // status codes without leaking internal details to the caller.
 var (
-	// ErrInvalidCredentials is returned when a phone/password pair does not match.
+	// ErrInvalidCredentials is returned when a username/password pair does not match.
 	ErrInvalidCredentials = errors.New("auth: invalid credentials")
 	// ErrTokenInvalid is returned when a refresh token is not found, expired, or revoked.
 	ErrTokenInvalid = errors.New("auth: refresh token is invalid or expired")
@@ -33,23 +33,23 @@ func NewService(userRepo users.Repository, tokenRepo TokenRepository, cfg *confi
 }
 
 // Register creates a new user account. Returns a wrapped users.ErrConflict if
-// the phone number is already taken — callers can detect it via errors.Is.
-func (s *Service) Register(ctx context.Context, name, phone, password string) (*users.User, error) {
+// the username is already taken — callers can detect it via errors.Is.
+func (s *Service) Register(ctx context.Context, name, username, password string) (*users.User, error) {
 	hash, err := HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("auth service: register: %w", err)
 	}
-	u := &users.User{Name: name, Phone: phone, PasswordHash: hash}
+	u := &users.User{Name: name, Username: username, PasswordHash: hash}
 	if err := s.users.Create(ctx, u); err != nil {
 		return nil, fmt.Errorf("auth service: register: %w", err)
 	}
 	return u, nil
 }
 
-// Login authenticates phone + password and issues a fresh token pair.
-// Returns ErrInvalidCredentials on bad phone or password.
-func (s *Service) Login(ctx context.Context, phone, password string) (access, refresh string, err error) {
-	u, err := s.users.GetByPhone(ctx, phone)
+// Login authenticates username + password and issues a fresh token pair.
+// Returns ErrInvalidCredentials on bad username or password.
+func (s *Service) Login(ctx context.Context, username, password string) (access, refresh string, err error) {
+	u, err := s.users.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, users.ErrNotFound) {
 			return "", "", ErrInvalidCredentials

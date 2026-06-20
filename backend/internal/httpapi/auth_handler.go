@@ -16,14 +16,14 @@ type authHandler struct {
 // register handles POST /api/auth/register.
 // On success: 201 with the created user object.
 // On validation failure: 422 with an error envelope.
-// On duplicate phone: 409.
+// On duplicate username: 409.
 func (h *authHandler) register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: err.Error()})
 		return
 	}
-	u, err := h.svc.Register(c.Request.Context(), req.Name, req.Phone, req.Password)
+	u, err := h.svc.Register(c.Request.Context(), req.Name, req.Username, req.Password)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -40,7 +40,7 @@ func (h *authHandler) login(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: err.Error()})
 		return
 	}
-	access, refresh, err := h.svc.Login(c.Request.Context(), req.Phone, req.Password)
+	access, refresh, err := h.svc.Login(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		respondError(c, err)
 		return
