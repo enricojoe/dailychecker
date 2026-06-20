@@ -2,10 +2,13 @@
  * Application router.
  *
  * Route table:
- *   /login      — public; authenticated users redirect to /
- *   /register   — public; authenticated users redirect to /
- *   /           — protected; renders AppShell + TodayPlaceholder (M8 wires content)
- *   *           — catch-all; redirects to /
+ *   /login        — public; authenticated users redirect to /
+ *   /register     — public; authenticated users redirect to /
+ *   /             — protected; Today page
+ *   /activities   — protected; Activity CRUD
+ *   /history      — protected; Calendar + By-Activity history
+ *   /telegram     — protected; Telegram connection
+ *   *             — catch-all; redirects to /
  */
 
 import { createBrowserRouter, Navigate } from 'react-router-dom'
@@ -14,7 +17,10 @@ import { ProtectedRoute } from './ProtectedRoute'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
 import { AppShell } from '@/components/AppShell'
-import { TodayPlaceholder } from '@/features/today/TodayPlaceholder'
+import { TodayPage } from '@/features/today/TodayPage'
+import { ActivitiesPage } from '@/features/activities/ActivitiesPage'
+import { HistoryPage } from '@/features/history/HistoryPage'
+import { TelegramPage } from '@/features/telegram/TelegramPage'
 
 export const router = createBrowserRouter([
   {
@@ -27,7 +33,12 @@ export const router = createBrowserRouter([
         children: [
           {
             element: <AppShell />,
-            children: [{ path: '/', element: <TodayPlaceholder /> }],
+            children: [
+              { path: '/', element: <TodayPage /> },
+              { path: '/activities', element: <ActivitiesPage /> },
+              { path: '/history', element: <HistoryPage /> },
+              { path: '/telegram', element: <TelegramPage /> },
+            ],
           },
         ],
       },

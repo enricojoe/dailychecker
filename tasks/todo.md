@@ -11,5 +11,5 @@
   - [x] M5 — Telegram integration (linking + sending; live DM check deferred) → See [tasks/plans/m5-telegram.md](plans/m5-telegram.md)
   - [x] M6 — Scheduler (per-activity reminders + nightly digest) → See [tasks/plans/m6-scheduler.md](plans/m6-scheduler.md)
   - [x] M7 — Frontend: auth & shell → See [tasks/plans/m7-frontend-auth-shell.md](plans/m7-frontend-auth-shell.md)
-  - [ ] M8 — Frontend: activities, today, history, telegram
+  - [x] M8 — Frontend: activities, today, history, telegram → See [tasks/plans/m8-frontend-features.md](plans/m8-frontend-features.md)
   - [ ] M9 — Hardening, docs & deployment

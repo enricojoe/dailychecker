@@ -9,10 +9,10 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { label: 'Today', to: '/', m8: false },
-  { label: 'Activities', to: '/activities', m8: true },
-  { label: 'History', to: '/history', m8: true },
-  { label: 'Telegram', to: '/telegram', m8: true },
+  { label: 'Today', to: '/' },
+  { label: 'Activities', to: '/activities' },
+  { label: 'History', to: '/history' },
+  { label: 'Telegram', to: '/telegram' },
 ] as const
 
 export function AppShell() {
@@ -46,34 +46,23 @@ export function AppShell() {
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
       <nav aria-label="Main navigation" className="border-b border-border">
         <div className="mx-auto flex max-w-5xl gap-0.5 px-4">
-          {NAV_ITEMS.map(({ label, to, m8 }) =>
-            m8 ? (
-              <span
-                key={to}
-                className="cursor-not-allowed px-3 py-2.5 text-sm text-muted-foreground/50"
-                aria-disabled="true"
-                title="Coming in M8"
-              >
-                {label}
-              </span>
-            ) : (
-              <NavLink
-                key={to}
-                to={to}
-                end
-                className={({ isActive }) =>
-                  cn(
-                    'px-3 py-2.5 text-sm transition-colors',
-                    isActive
-                      ? 'border-b-2 border-primary font-medium text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )
-                }
-              >
-                {label}
-              </NavLink>
-            )
-          )}
+          {NAV_ITEMS.map(({ label, to }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end
+              className={({ isActive }) =>
+                cn(
+                  'px-3 py-2.5 text-sm transition-colors',
+                  isActive
+                    ? 'border-b-2 border-primary font-medium text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
         </div>
       </nav>
 
