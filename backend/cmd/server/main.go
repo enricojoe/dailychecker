@@ -34,7 +34,7 @@ func main() {
 	}
 	defer database.Close()
 
-	if err := db.RunMigrations(database.DB, filepath.Join(wd, "migrations")); err != nil {
+	if err := db.RunMigrations(cfg.DatabaseURL, filepath.Join(wd, "migrations")); err != nil {
 		log.Fatalf("main: migrations: %v", err)
 	}
 

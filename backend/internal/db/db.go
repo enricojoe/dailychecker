@@ -31,8 +31,26 @@ func Connect(databaseURL string) (*sqlx.DB, error) {
 }
 
 // RunMigrations applies all pending up migrations found in migrationsDir.
-// It is a no-op (not an error) when there are no .sql files or nothing new to migrate.
-func RunMigrations(db *sql.DB, migrationsDir string) error {
+// It opens its own short-lived *sql.DB so the caller's main connection is
+// never closed. It is a no-op (not an error) when nothing new needs applying.
+func RunMigrations(databaseURL string, migrationsDir string) error {
+	return runMigrate(databaseURL, migrationsDir, func(m *migrate.Migrate) error {
+		return m.Up()
+	})
+}
+
+// RunMigrationsDown rolls back all applied migrations in migrationsDir.
+// It opens its own short-lived *sql.DB. It is a no-op when nothing is applied.
+func RunMigrationsDown(databaseURL string, migrationsDir string) error {
+	return runMigrate(databaseURL, migrationsDir, func(m *migrate.Migrate) error {
+		return m.Down()
+	})
+}
+
+// runMigrate is the shared implementation. It opens a dedicated *sql.DB for
+// the golang-migrate runner, applies fn, then lets m.Close() manage its own
+// connection lifecycle — leaving the caller's connection untouched.
+func runMigrate(databaseURL string, migrationsDir string, fn func(*migrate.Migrate) error) error {
 	empty, err := dirHasNoSQLFiles(migrationsDir)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
@@ -42,8 +60,16 @@ func RunMigrations(db *sql.DB, migrationsDir string) error {
 		return nil
 	}
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	// Open a dedicated connection for golang-migrate. m.Close() will close it;
+	// the caller's *sqlx.DB remains open.
+	rawDB, err := sql.Open("postgres", databaseURL)
 	if err != nil {
+		return fmt.Errorf("migrate: open dedicated conn: %w", err)
+	}
+
+	driver, err := postgres.WithInstance(rawDB, &postgres.Config{})
+	if err != nil {
+		rawDB.Close()
 		return fmt.Errorf("migrate: postgres driver: %w", err)
 	}
 
@@ -53,11 +79,13 @@ func RunMigrations(db *sql.DB, migrationsDir string) error {
 		driver,
 	)
 	if err != nil {
+		rawDB.Close()
 		return fmt.Errorf("migrate: init: %w", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("migrate: up: %w", err)
+	if err := fn(m); err != nil && err != migrate.ErrNoChange {
+		m.Close() //nolint:errcheck
+		return fmt.Errorf("migrate: %w", err)
 	}
 
 	srcErr, dbErr := m.Close()
