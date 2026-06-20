@@ -64,10 +64,9 @@ cp .env.example .env          # adjust JWT_SECRET etc.
 cd .. && make run             # migrations run automatically on boot; serves :8080
 
 # 3. Frontend (separate terminal)
-cd frontend
-cp .env.example .env          # VITE_API_BASE_URL=http://localhost:8080/api
-npm install
-npm run dev                   # serves :5173
+cp frontend/.env.example frontend/.env   # VITE_API_BASE_URL=http://localhost:8080/api
+make frontend-install                    # npm install
+make frontend                            # npm run dev — serves :5173
 ```
 
 Open http://localhost:5173 — register an account, then create activities and check
@@ -156,12 +155,9 @@ The app runs fine **without** a bot (`TELEGRAM_BOT_TOKEN` empty). To enable remi
 ## Tests
 
 ```bash
-make test          # backend: go test ./...  (needs `make db-up` first)
-
-cd frontend
-npx tsc --noEmit   # typecheck
-npm run build      # production build
-npm run lint
+make test            # backend: go test ./...  (needs `make db-up` first)
+make frontend-lint   # frontend: tsc --noEmit + eslint
+make frontend-build  # frontend: production build
 ```
 
 Backend integration tests run against the dev Postgres on port 5433 and are safe

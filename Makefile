@@ -1,4 +1,6 @@
-.PHONY: run build test db-up db-down docker-build docker-up docker-down
+.PHONY: run build test \
+	frontend-install frontend frontend-build frontend-lint \
+	db-up db-down docker-build docker-up docker-down
 
 COMPOSE := docker compose -f docker/docker-compose.yml
 
@@ -13,6 +15,22 @@ build:
 ## test: run all backend tests
 test:
 	cd backend && go test ./...
+
+## frontend-install: install frontend dependencies
+frontend-install:
+	cd frontend && npm install
+
+## frontend: start the frontend dev server (Vite)
+frontend:
+	cd frontend && npm run dev
+
+## frontend-build: type-check and build the production frontend bundle
+frontend-build:
+	cd frontend && npm run build
+
+## frontend-lint: type-check (tsc) and lint the frontend
+frontend-lint:
+	cd frontend && npx tsc --noEmit && npm run lint
 
 ## db-up: start Postgres in Docker (detached)
 db-up:
