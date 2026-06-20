@@ -16,6 +16,7 @@ import (
 	"github.com/enricojoe/dailychecker/internal/db"
 	"github.com/enricojoe/dailychecker/internal/httpapi"
 	"github.com/enricojoe/dailychecker/internal/occurrences"
+	"github.com/enricojoe/dailychecker/internal/scheduler"
 	"github.com/enricojoe/dailychecker/internal/telegram"
 	"github.com/enricojoe/dailychecker/internal/users"
 )
@@ -62,14 +63,17 @@ func main() {
 
 	// Telegram is optional: a missing bot token is not fatal — the server
 	// boots fine without it and the /api/telegram/link route is not registered.
+	// The scheduler is also only started when a Telegram client is available.
 	var tgSvc *telegram.Service
 	var poller *telegram.Poller
+	var sched *scheduler.Scheduler
 	if cfg.TelegramBotToken != "" {
 		tgClient := telegram.NewClient(cfg.TelegramBotToken, "https://api.telegram.org", nil)
 		tgSvc = telegram.NewService(userRepo, cfg, tgClient)
 		poller = telegram.NewPoller(cfg.TelegramBotToken, "https://api.telegram.org", nil, tgSvc)
+		sched = scheduler.New(occRepo, tgClient, loc, time.Now, cfg.DigestHour, cfg.AppPublicURL)
 	} else {
-		log.Println("telegram: disabled (TELEGRAM_BOT_TOKEN not set)")
+		log.Println("telegram: disabled (TELEGRAM_BOT_TOKEN not set); scheduler not started")
 	}
 
 	router := httpapi.NewRouter(authSvc, actSvc, occSvc, tgSvc, cfg.JWTSecret)
@@ -82,12 +86,16 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// pollerCtx is cancelled on shutdown so the poll loop exits cleanly.
+	// pollerCtx is cancelled on shutdown so the poll loop and scheduler exit cleanly.
 	pollerCtx, cancelPoller := context.WithCancel(context.Background())
 	defer cancelPoller()
 
 	if poller != nil {
 		go poller.Run(pollerCtx)
+	}
+
+	if sched != nil {
+		sched.Start(pollerCtx)
 	}
 
 	go func() {
@@ -103,8 +111,11 @@ func main() {
 
 	log.Println("server: shutting down gracefully")
 
-	// Stop the Telegram poller before draining HTTP connections.
+	// Stop the Telegram poller and scheduler before draining HTTP connections.
 	cancelPoller()
+	if sched != nil {
+		sched.Stop()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

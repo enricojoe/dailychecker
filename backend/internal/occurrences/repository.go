@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // Valid state values for Occurrence.State.
@@ -45,6 +46,23 @@ type CalendarDay struct {
 	Partial int       `db:"partial"`
 	Done    int       `db:"done"`
 	Total   int       `db:"total"`
+}
+
+// ReminderRow is the minimal projection returned by ListDueReminders.
+// It carries only the fields the scheduler needs to send a notification.
+type ReminderRow struct {
+	OccurrenceID string `db:"occurrence_id"`
+	ChatID       int64  `db:"chat_id"`
+	Title        string `db:"title"`
+}
+
+// DigestRow is the minimal projection returned by ListDigestItems.
+// Rows are ordered by user so the scheduler can group them into per-user messages.
+type DigestRow struct {
+	OccurrenceID string `db:"occurrence_id"`
+	UserID       string `db:"user_id"`
+	ChatID       int64  `db:"chat_id"`
+	Title        string `db:"title"`
 }
 
 // Repository is the data-access contract consumed by the service layer.
@@ -83,6 +101,34 @@ type Repository interface {
 	// occurrences owned by userID within the inclusive date range [from, to].
 	// Uses a single grouped JOIN query — no N+1.
 	ListCalendarSummary(ctx context.Context, userID string, from, to time.Time) ([]*CalendarDay, error)
+
+	// ListDueReminders returns one ReminderRow per top-level (parent_id IS NULL),
+	// active occurrence that:
+	//   - falls on the given date,
+	//   - has time_of_day <= asOf's time-of-day portion (Jakarta),
+	//   - is not in state 'done',
+	//   - has per_activity_notified_at IS NULL (not yet sent),
+	//   - belongs to a user with a non-NULL telegram_chat_id.
+	//
+	// The <= comparison means a reminder missed during downtime still fires on
+	// the next tick; the dedup flag (per_activity_notified_at) guarantees it
+	// fires exactly once per occurrence. Uses a single JOIN — no N+1.
+	ListDueReminders(ctx context.Context, date time.Time, asOf time.Time) ([]ReminderRow, error)
+
+	// MarkPerActivityNotified sets per_activity_notified_at = NOW() on the
+	// occurrence identified by occurrenceID.
+	MarkPerActivityNotified(ctx context.Context, occurrenceID string) error
+
+	// ListDigestItems returns one DigestRow per not-done occurrence (any level)
+	// on the given date where digest_notified_at IS NULL and the owning user has
+	// a non-NULL telegram_chat_id. Rows are ordered by user_id so the scheduler
+	// can group them into per-user messages without a second query. Uses a single
+	// JOIN — no N+1.
+	ListDigestItems(ctx context.Context, date time.Time) ([]DigestRow, error)
+
+	// MarkDigestNotified sets digest_notified_at = NOW() on all occurrences
+	// whose IDs are in occurrenceIDs. A single UPDATE IN (...) is used — no N+1.
+	MarkDigestNotified(ctx context.Context, occurrenceIDs []string) error
 }
 
 type sqlxRepository struct {
@@ -240,4 +286,103 @@ func (r *sqlxRepository) ListCalendarSummary(
 		return nil, fmt.Errorf("occurrences: list calendar summary: %w", err)
 	}
 	return list, nil
+}
+
+// ListDueReminders returns reminder rows for top-level active occurrences on
+// date whose scheduled time_of_day has been reached (time_of_day <= asOf's
+// time portion in Jakarta), are not done, have not yet been notified, and
+// belong to a user with a telegram_chat_id.
+//
+// The asOf parameter is expected to be in Jakarta local time already; only its
+// time-of-day component (HH:MM:SS) is used in the comparison.
+func (r *sqlxRepository) ListDueReminders(ctx context.Context, date time.Time, asOf time.Time) ([]ReminderRow, error) {
+	// Format the time-of-day portion as HH:MM:SS for the cast comparison.
+	// time_of_day is stored as a Postgres TIME column; we compare it against
+	// the time-of-day extracted from asOf.
+	const q = `
+		SELECT
+		    o.id                  AS occurrence_id,
+		    u.telegram_chat_id    AS chat_id,
+		    a.title               AS title
+		FROM   occurrences o
+		JOIN   activities  a ON a.id    = o.activity_id
+		JOIN   users       u ON u.id    = a.user_id
+		WHERE  o.occur_date                = $1
+		  AND  a.parent_id               IS NULL
+		  AND  a.is_active                = TRUE
+		  AND  a.time_of_day             <= $2::TIME
+		  AND  o.state                   != 'done'
+		  AND  o.per_activity_notified_at IS NULL
+		  AND  u.telegram_chat_id        IS NOT NULL`
+
+	// Pass only the date portion for occur_date, and a HH:MM:SS string for
+	// the time comparison so Postgres can cast it to TIME cleanly.
+	timeStr := asOf.Format("15:04:05")
+
+	var rows []ReminderRow
+	if err := r.db.SelectContext(ctx, &rows, q, date, timeStr); err != nil {
+		return nil, fmt.Errorf("occurrences: list due reminders: %w", err)
+	}
+	return rows, nil
+}
+
+// MarkPerActivityNotified sets per_activity_notified_at = NOW() on a single
+// occurrence. A missed occurrence can still be marked after a restart since
+// ListDueReminders will have re-selected it.
+func (r *sqlxRepository) MarkPerActivityNotified(ctx context.Context, occurrenceID string) error {
+	const q = `
+		UPDATE occurrences
+		SET    per_activity_notified_at = NOW()
+		WHERE  id = $1`
+
+	if _, err := r.db.ExecContext(ctx, q, occurrenceID); err != nil {
+		return fmt.Errorf("occurrences: mark per-activity notified: %w", err)
+	}
+	return nil
+}
+
+// ListDigestItems returns all not-done, not-yet-digest-notified occurrences on
+// date for users with a telegram_chat_id. Both parent and child occurrences
+// are included. Rows are ordered by user_id for efficient grouping by the caller.
+func (r *sqlxRepository) ListDigestItems(ctx context.Context, date time.Time) ([]DigestRow, error) {
+	const q = `
+		SELECT
+		    o.id                AS occurrence_id,
+		    a.user_id           AS user_id,
+		    u.telegram_chat_id  AS chat_id,
+		    a.title             AS title
+		FROM   occurrences o
+		JOIN   activities  a ON a.id = o.activity_id
+		JOIN   users       u ON u.id = a.user_id
+		WHERE  o.occur_date              = $1
+		  AND  o.state                  != 'done'
+		  AND  o.digest_notified_at     IS NULL
+		  AND  u.telegram_chat_id       IS NOT NULL
+		ORDER  BY a.user_id, a.parent_id NULLS FIRST, a.sort_order, a.created_at`
+
+	var rows []DigestRow
+	if err := r.db.SelectContext(ctx, &rows, q, date); err != nil {
+		return nil, fmt.Errorf("occurrences: list digest items: %w", err)
+	}
+	return rows, nil
+}
+
+// MarkDigestNotified sets digest_notified_at = NOW() on all occurrences in
+// occurrenceIDs using a single UPDATE ... WHERE id = ANY(...) — no N+1.
+func (r *sqlxRepository) MarkDigestNotified(ctx context.Context, occurrenceIDs []string) error {
+	if len(occurrenceIDs) == 0 {
+		return nil
+	}
+
+	// lib/pq supports array binding via pq.Array, which maps []string to
+	// Postgres text[] so we can use = ANY($1) instead of IN (...).
+	const q = `
+		UPDATE occurrences
+		SET    digest_notified_at = NOW()
+		WHERE  id = ANY($1)`
+
+	if _, err := r.db.ExecContext(ctx, q, pq.Array(occurrenceIDs)); err != nil {
+		return fmt.Errorf("occurrences: mark digest notified: %w", err)
+	}
+	return nil
 }
