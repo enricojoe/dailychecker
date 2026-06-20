@@ -127,4 +127,11 @@
   html {
     @apply font-sans;
     }
+  /* Clickable controls show a pointer cursor (Tailwind v4 no longer does this
+     by default). Disabled buttons keep the default arrow. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for] {
+    @apply cursor-pointer;
+    }
 }

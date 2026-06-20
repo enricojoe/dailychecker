@@ -19,12 +19,16 @@
 
 import { tokenStore } from '@/auth/tokenStore'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
+// Fall back to the documented dev default so a missing frontend/.env never
+// produces request URLs like "undefined/auth/register".
+const DEFAULT_BASE_URL = 'http://localhost:8080/api'
+const BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? DEFAULT_BASE_URL
 
-if (!BASE_URL) {
+if (!import.meta.env.VITE_API_BASE_URL) {
   console.warn(
-    '[apiClient] VITE_API_BASE_URL is not set. ' +
-      'Copy frontend/.env.example to frontend/.env and fill in the value.'
+    `[apiClient] VITE_API_BASE_URL is not set — falling back to ${DEFAULT_BASE_URL}. ` +
+      'Copy frontend/.env.example to frontend/.env to configure it.'
   )
 }
 
