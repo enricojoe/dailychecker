@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/enricojoe/dailychecker/internal/activities"
 	"github.com/enricojoe/dailychecker/internal/auth"
 	"github.com/enricojoe/dailychecker/internal/users"
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,7 @@ type errResponse struct {
 // leaking internal details to the caller.
 func respondError(c *gin.Context, err error) {
 	switch {
+	// Auth errors.
 	case errors.Is(err, users.ErrConflict):
 		c.JSON(http.StatusConflict, errResponse{Error: "phone already registered"})
 	case errors.Is(err, auth.ErrInvalidCredentials):
@@ -27,6 +29,17 @@ func respondError(c *gin.Context, err error) {
 		c.JSON(http.StatusUnauthorized, errResponse{Error: "invalid or expired refresh token"})
 	case errors.Is(err, users.ErrNotFound):
 		c.JSON(http.StatusNotFound, errResponse{Error: "user not found"})
+
+	// Activities errors.
+	case errors.Is(err, activities.ErrNotFound):
+		c.JSON(http.StatusNotFound, errResponse{Error: "activity not found"})
+	case errors.Is(err, activities.ErrInvalidParent):
+		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: "parent_id must refer to an existing top-level activity belonging to you"})
+	case errors.Is(err, activities.ErrHasChildren):
+		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: "cannot assign a parent to an activity that already has children"})
+	case errors.Is(err, activities.ErrInvalidSchedule):
+		c.JSON(http.StatusUnprocessableEntity, errResponse{Error: "invalid schedule: weekly frequency requires at least one day_of_week; daily frequency requires none"})
+
 	default:
 		c.JSON(http.StatusInternalServerError, errResponse{Error: "internal server error"})
 	}

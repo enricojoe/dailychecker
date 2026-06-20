@@ -4,21 +4,22 @@ package httpapi
 import (
 	"net/http"
 
+	"github.com/enricojoe/dailychecker/internal/activities"
 	"github.com/enricojoe/dailychecker/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 
 // NewRouter constructs and returns the configured Gin engine with all routes
-// and middleware registered. It accepts an auth.Service for the auth endpoints
-// and the JWT secret for the RequireAuth middleware. Feature routes from later
-// milestones are added here as they land.
-func NewRouter(authSvc *auth.Service, jwtSecret string) *gin.Engine {
+// and middleware registered. It accepts concrete service pointers for each
+// feature domain and the JWT secret for the RequireAuth middleware.
+func NewRouter(authSvc *auth.Service, actSvc *activities.Service, jwtSecret string) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
 	r.GET("/healthz", healthz)
 
 	ah := &authHandler{svc: authSvc}
+	acth := &activitiesHandler{svc: actSvc}
 
 	api := r.Group("/api")
 
@@ -33,6 +34,14 @@ func NewRouter(authSvc *auth.Service, jwtSecret string) *gin.Engine {
 	protected := api.Group("")
 	protected.Use(auth.RequireAuth(jwtSecret))
 	protected.GET("/me", ah.me)
+
+	// Activities CRUD — all protected.
+	actGroup := protected.Group("/activities")
+	actGroup.GET("", acth.list)
+	actGroup.POST("", acth.create)
+	actGroup.GET("/:id", acth.getByID)
+	actGroup.PATCH("/:id", acth.patch)
+	actGroup.DELETE("/:id", acth.del)
 
 	return r
 }

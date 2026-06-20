@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/enricojoe/dailychecker/internal/activities"
 	"github.com/enricojoe/dailychecker/internal/auth"
 	"github.com/enricojoe/dailychecker/internal/config"
 	"github.com/enricojoe/dailychecker/internal/httpapi"
@@ -46,7 +47,10 @@ func TestMain(m *testing.M) {
 	tokenRepo := auth.NewTokenRepository(testDB)
 	authSvc := auth.NewService(userRepo, tokenRepo, cfg)
 
-	testRouter = httpapi.NewRouter(authSvc, cfg.JWTSecret)
+	actRepo := activities.NewRepository(testDB)
+	actSvc := activities.NewService(actRepo)
+
+	testRouter = httpapi.NewRouter(authSvc, actSvc, cfg.JWTSecret)
 
 	code := m.Run()
 	testDB.Close()

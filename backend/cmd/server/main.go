@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/enricojoe/dailychecker/internal/activities"
 	"github.com/enricojoe/dailychecker/internal/auth"
 	"github.com/enricojoe/dailychecker/internal/config"
 	"github.com/enricojoe/dailychecker/internal/db"
@@ -45,7 +46,10 @@ func main() {
 	tokenRepo := auth.NewTokenRepository(database)
 	authSvc := auth.NewService(userRepo, tokenRepo, cfg)
 
-	router := httpapi.NewRouter(authSvc, cfg.JWTSecret)
+	actRepo := activities.NewRepository(database)
+	actSvc := activities.NewService(actRepo)
+
+	router := httpapi.NewRouter(authSvc, actSvc, cfg.JWTSecret)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

@@ -2,6 +2,40 @@
 // request/response DTOs, and HTTP handlers. No business logic lives here.
 package httpapi
 
+// ── Activity DTOs ────────────────────────────────────────────────────────────
+
+// CreateActivityRequest is the JSON body for POST /api/activities.
+// days_of_week is required (and must be non-empty) when freq is "weekly";
+// it must be absent or empty when freq is "daily".
+type CreateActivityRequest struct {
+	ParentID   *string  `json:"parent_id"`
+	Title      string   `json:"title"       binding:"required"`
+	Notes      *string  `json:"notes"`
+	Freq       string   `json:"freq"        binding:"required"`
+	DaysOfWeek []int64  `json:"days_of_week"`
+	TimeOfDay  string   `json:"time_of_day" binding:"required"`
+	SortOrder  int      `json:"sort_order"`
+	IsActive   *bool    `json:"is_active"` // defaults to true when omitted
+}
+
+// PatchActivityRequest is the JSON body for PATCH /api/activities/:id.
+// Every field is optional; omit a field to leave its value unchanged.
+//
+// Limitation: nullable string fields (notes, parent_id) cannot be explicitly
+// cleared to SQL NULL via this struct because encoding/json maps both "absent"
+// and "null" JSON values to a nil *string. Clearing nullable fields is deferred
+// to a later milestone.
+type PatchActivityRequest struct {
+	Title      *string  `json:"title"`
+	Notes      *string  `json:"notes"`
+	Freq       *string  `json:"freq"`
+	DaysOfWeek *[]int64 `json:"days_of_week"`
+	TimeOfDay  *string  `json:"time_of_day"`
+	SortOrder  *int     `json:"sort_order"`
+	IsActive   *bool    `json:"is_active"`
+	ParentID   *string  `json:"parent_id"`
+}
+
 // RegisterRequest is the JSON body for POST /api/auth/register.
 type RegisterRequest struct {
 	Name     string `json:"name"     binding:"required,min=1,max=100"`

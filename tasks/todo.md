@@ -6,7 +6,7 @@
   - [x] M0 — Project scaffolding & tooling
   - [x] M1 — Database schema & migrations
   - [x] M2 — Auth (register/login/refresh) → See [tasks/plans/m2-auth.md](plans/m2-auth.md)
-  - [ ] M3 — Activities & sub-activities + state rollup
+  - [x] M3 — Activities & sub-activities + state rollup → See [tasks/plans/m3-activities-rollup.md](plans/m3-activities-rollup.md)
   - [ ] M4 — Occurrences, today view & history
   - [ ] M5 — Telegram integration (linking + sending)
   - [ ] M6 — Scheduler (per-activity reminders + nightly digest)

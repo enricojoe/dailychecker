@@ -24,3 +24,9 @@
 - **Context:** DailyChecker M2 — `Logout` service method calling the `TokenRepository.Revoke` method on an already-revoked refresh token.
 - **Mistake:** `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1` matches the row regardless of whether `revoked_at` is already set, returning 1 row affected and no error. A second logout with the same token silently succeeded.
 - **Correct Pattern:** Before calling `Revoke`, fetch the token with `GetByHash` and inspect its application state (`RevokedAt != nil`) to detect the already-revoked case. Return a sentinel error (`ErrTokenInvalid`) rather than letting the DB mutation determine business validity.
+
+## Destructive migration tests race the shared DB under parallel `go test ./...`
+
+- **Context:** DailyChecker — `internal/db` `TestMigrationsUpDown` ran an up→down→up cycle against the shared `dailychecker` test DB; all other integration-test packages use the same DB.
+- **Mistake:** `go test ./...` runs package test binaries IN PARALLEL by default. The `down` phase dropped all tables mid-flight, so concurrent packages failed intermittently with `pq: relation "occurrences" does not exist (42P01)`. `go test -p 1` masked it; the default run failed. Test caching/timing hid it on the first M3 run.
+- **Correct Pattern:** Any test that DROPs/recreates schema must run against its OWN isolated, throwaway database — never the shared one. Derive an admin DSN (point the URL path at the `postgres` maintenance DB), `CREATE DATABASE test_xxx_<millis>_<pid>` on a short-lived `*sql.DB` (CREATE/DROP DATABASE can't run in a transaction), run the cycle there, then terminate connections + `DROP DATABASE` in cleanup. Never make the suite depend on `-p 1`. Requires the dev role to have `CREATEDB`.
