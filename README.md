@@ -70,8 +70,18 @@ make frontend                            # npm run dev — serves :5173
 ```
 
 Open http://localhost:5173 — register an account, then create activities and check
-them off on the Today page. The backend already allows the `:5173` origin via
-`CORS_ALLOWED_ORIGINS`.
+them off on the Today page.
+
+### Access from other devices on your network (LAN)
+
+The Vite dev server binds to all interfaces and proxies `/api` to the backend
+(`VITE_API_BASE_URL=/api`, see `vite.config.ts`), so any device on the same wifi
+can use the app with no extra config:
+
+1. `make run` (backend on `:8080`) and `make frontend` (dev server).
+2. Vite prints a **Network:** URL — open `http://<your-machine-ip>:5173` on the
+   other device (phone/tablet). API calls are proxied through the dev server, so
+   there's no CORS setup and no hardcoded IP.
 
 ## Running with Docker (full stack)
 
