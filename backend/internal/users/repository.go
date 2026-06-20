@@ -49,6 +49,11 @@ type Repository interface {
 	// GetByPhone returns the user with the given phone number, or ErrNotFound.
 	GetByPhone(ctx context.Context, phone string) (*User, error)
 
+	// GetByLinkToken returns the user whose telegram_link_token matches token,
+	// or ErrNotFound when no row matches. Used during the Telegram deep-link
+	// linking flow to consume a one-time token.
+	GetByLinkToken(ctx context.Context, token string) (*User, error)
+
 	// Update persists changes to Name and the Telegram fields (chat ID, link
 	// token, linked-at). UpdatedAt is refreshed by the database and written
 	// back into u.
@@ -104,6 +109,24 @@ func (r *sqlxRepository) GetByPhone(ctx context.Context, phone string) (*User, e
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("users: get by phone: %w", err)
+	}
+	return &u, nil
+}
+
+func (r *sqlxRepository) GetByLinkToken(ctx context.Context, token string) (*User, error) {
+	const q = `
+		SELECT id, name, phone, password_hash,
+		       telegram_chat_id, telegram_link_token, telegram_linked_at,
+		       created_at, updated_at
+		FROM users
+		WHERE telegram_link_token = $1`
+
+	var u User
+	if err := r.db.GetContext(ctx, &u, q, token); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("users: get by link token: %w", err)
 	}
 	return &u, nil
 }

@@ -7,16 +7,21 @@ import (
 	"github.com/enricojoe/dailychecker/internal/activities"
 	"github.com/enricojoe/dailychecker/internal/auth"
 	"github.com/enricojoe/dailychecker/internal/occurrences"
+	"github.com/enricojoe/dailychecker/internal/telegram"
 	"github.com/gin-gonic/gin"
 )
 
 // NewRouter constructs and returns the configured Gin engine with all routes
 // and middleware registered. It accepts concrete service pointers for each
 // feature domain and the JWT secret for the RequireAuth middleware.
+//
+// tgSvc may be nil when the Telegram bot token is absent (the server boots
+// fine without it; the telegram route group is simply not registered).
 func NewRouter(
 	authSvc *auth.Service,
 	actSvc *activities.Service,
 	occSvc *occurrences.Service,
+	tgSvc *telegram.Service,
 	jwtSecret string,
 ) *gin.Engine {
 	r := gin.New()
@@ -59,6 +64,12 @@ func NewRouter(
 	historyGroup.GET("/calendar", occh.calendarSummary)
 	historyGroup.GET("/calendar/:date", occh.calendarDay)
 	historyGroup.GET("/activities/:id", occh.activityHistory)
+
+	// Telegram — only registered when a service is wired (token present).
+	if tgSvc != nil {
+		tgh := &telegramHandler{svc: tgSvc}
+		protected.POST("/telegram/link", tgh.link)
+	}
 
 	return r
 }

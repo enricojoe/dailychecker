@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,11 +17,18 @@ import (
 	"github.com/enricojoe/dailychecker/internal/config"
 	"github.com/enricojoe/dailychecker/internal/httpapi"
 	"github.com/enricojoe/dailychecker/internal/occurrences"
+	"github.com/enricojoe/dailychecker/internal/telegram"
 	"github.com/enricojoe/dailychecker/internal/testhelper"
 	"github.com/enricojoe/dailychecker/internal/users"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
+
+// httpTestMockTgClient is a no-op telegram.Client used in httpapi integration
+// tests so we don't need a real bot token.
+type httpTestMockTgClient struct{}
+
+func (httpTestMockTgClient) SendMessage(_ context.Context, _ int64, _ string) error { return nil }
 
 var (
 	testRouter    http.Handler
@@ -60,7 +68,13 @@ func TestMain(m *testing.M) {
 	occRepo := occurrences.NewRepository(testDB)
 	occSvc := occurrences.NewService(occRepo, actRepo, loc)
 
-	testRouter = httpapi.NewRouter(authSvc, actSvc, occSvc, cfg.JWTSecret)
+	tgCfg := &config.Config{
+		TelegramBotUsername: "TestBot",
+		AppPublicURL:        "http://localhost:5173",
+	}
+	tgSvc := telegram.NewService(userRepo, tgCfg, httpTestMockTgClient{})
+
+	testRouter = httpapi.NewRouter(authSvc, actSvc, occSvc, tgSvc, cfg.JWTSecret)
 
 	code := m.Run()
 	testDB.Close()

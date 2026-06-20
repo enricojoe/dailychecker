@@ -86,3 +86,13 @@ type TokenPair struct {
 	Access  string `json:"access"`
 	Refresh string `json:"refresh"`
 }
+
+// ── Telegram DTOs ─────────────────────────────────────────────────────────────
+
+// TelegramLinkResponse is the JSON response for POST /api/telegram/link.
+// It carries both the deep-link URL (for display/QR code) and the raw token
+// (in case the client wants to construct its own URL).
+type TelegramLinkResponse struct {
+	URL   string `json:"url"`
+	Token string `json:"token"`
+}

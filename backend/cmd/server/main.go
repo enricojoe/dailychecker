@@ -16,6 +16,7 @@ import (
 	"github.com/enricojoe/dailychecker/internal/db"
 	"github.com/enricojoe/dailychecker/internal/httpapi"
 	"github.com/enricojoe/dailychecker/internal/occurrences"
+	"github.com/enricojoe/dailychecker/internal/telegram"
 	"github.com/enricojoe/dailychecker/internal/users"
 )
 
@@ -59,7 +60,19 @@ func main() {
 	occRepo := occurrences.NewRepository(database)
 	occSvc := occurrences.NewService(occRepo, actRepo, loc)
 
-	router := httpapi.NewRouter(authSvc, actSvc, occSvc, cfg.JWTSecret)
+	// Telegram is optional: a missing bot token is not fatal — the server
+	// boots fine without it and the /api/telegram/link route is not registered.
+	var tgSvc *telegram.Service
+	var poller *telegram.Poller
+	if cfg.TelegramBotToken != "" {
+		tgClient := telegram.NewClient(cfg.TelegramBotToken, "https://api.telegram.org", nil)
+		tgSvc = telegram.NewService(userRepo, cfg, tgClient)
+		poller = telegram.NewPoller(cfg.TelegramBotToken, "https://api.telegram.org", nil, tgSvc)
+	} else {
+		log.Println("telegram: disabled (TELEGRAM_BOT_TOKEN not set)")
+	}
+
+	router := httpapi.NewRouter(authSvc, actSvc, occSvc, tgSvc, cfg.JWTSecret)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -67,6 +80,14 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
+	}
+
+	// pollerCtx is cancelled on shutdown so the poll loop exits cleanly.
+	pollerCtx, cancelPoller := context.WithCancel(context.Background())
+	defer cancelPoller()
+
+	if poller != nil {
+		go poller.Run(pollerCtx)
 	}
 
 	go func() {
@@ -81,6 +102,9 @@ func main() {
 	<-quit
 
 	log.Println("server: shutting down gracefully")
+
+	// Stop the Telegram poller before draining HTTP connections.
+	cancelPoller()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
