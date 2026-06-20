@@ -10,13 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/enricojoe/dailychecker/internal/auth"
 	"github.com/enricojoe/dailychecker/internal/config"
 	"github.com/enricojoe/dailychecker/internal/db"
 	"github.com/enricojoe/dailychecker/internal/httpapi"
+	"github.com/enricojoe/dailychecker/internal/users"
 )
 
 func main() {
-	// All paths are resolved relative to the working directory so that
+	// Resolve paths relative to the working directory so that
 	// `cd backend && go run ./cmd/server` picks up backend/.env and backend/migrations.
 	wd, err := os.Getwd()
 	if err != nil {
@@ -38,7 +40,12 @@ func main() {
 		log.Fatalf("main: migrations: %v", err)
 	}
 
-	router := httpapi.NewRouter()
+	// Construct repositories and services — dependencies flow inward.
+	userRepo := users.NewRepository(database)
+	tokenRepo := auth.NewTokenRepository(database)
+	authSvc := auth.NewService(userRepo, tokenRepo, cfg)
+
+	router := httpapi.NewRouter(authSvc, cfg.JWTSecret)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

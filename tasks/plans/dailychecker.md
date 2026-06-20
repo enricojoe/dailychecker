@@ -198,13 +198,13 @@ Done** is met and verified, then fill in the Result note.
 - **Result:** _2026-06-20_ — Completed & verified (commit `de4877a`). 4 migrations (uuid PKs, FKs, `pending|partial|done` state, unique `(activity_id, occur_date)`); indexes per DoD present. Programmatic golang-migrate runner gained `RunMigrationsDown` + isolated short-lived connection so `m.Close()` never touches the app pool; up→down→up cycle test passes against real Postgres. sqlx repos for users/auth/activities/occurrences with 27 passing integration subtests (testhelper auto-loads `backend/.env` via godotenv). Fixed prior session's build break (missing `lib/pq` import) and switched activities queries off `SELECT *` to explicit columns with `time_of_day::TEXT` to avoid lib/pq TIME→time.Time scan issues. `go build`/`go vet` clean. Tests run against the dev DB on host port 5433.
 
 ### Milestone 2 — Auth (register, login, refresh, middleware)
-- [ ] bcrypt password hashing
-- [ ] JWT access tokens (short TTL, ~15m); refresh tokens hashed + stored in DB
-- [ ] `/register`, `/login`, `/refresh`, `/logout`, `/me`
-- [ ] Gin auth middleware; refresh rotation + revocation
-- [ ] Unit/integration tests incl. expired/invalid/revoked token paths
+- [x] bcrypt password hashing
+- [x] JWT access tokens (short TTL, ~15m); refresh tokens hashed + stored in DB
+- [x] `/register`, `/login`, `/refresh`, `/logout`, `/me`
+- [x] Gin auth middleware; refresh rotation + revocation
+- [x] Unit/integration tests incl. expired/invalid/revoked token paths
 - **DoD:** Full auth cycle works via API tests; protected route rejects missing/invalid tokens.
-- **Result:** _TBD_
+- **Result:** _2026-06-20_ — Completed & verified (see [m2-auth.md](m2-auth.md)). HS256 JWT access tokens (15m, validated in-process, no per-request DB hit); refresh tokens are random + stored SHA-256-hashed, rotated on every refresh (old revoked before new issued; reused/revoked/unknown rejected). `auth` pkg: `token.go` (bcrypt + JWT + refresh gen), `service.go` (Register/Login/Refresh/Logout/Me + typed sentinels), `middleware.go` (`RequireAuth`). `httpapi`: DTOs, `{error}` envelope, handlers; `NewRouter` rewired for DI (`*auth.Service` + JWT secret), `main.go` wires repos→service→router. Bug caught & fixed: double-logout silently succeeded because `UPDATE … SET revoked_at` matches already-revoked rows — service now checks `RevokedAt != nil` first (lesson recorded). 29 auth tests pass (unit + HTTP integration incl. expired/invalid/revoked/reused paths); `go build`/`go vet`/`go test ./...` clean. Dep added: `github.com/golang-jwt/jwt/v5`.
 
 ### Milestone 3 — Activities & Sub-activities (templates + state rollup)
 - [ ] CRUD for activities incl. `parent_id`, schedule fields, ordering

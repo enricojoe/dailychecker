@@ -18,3 +18,9 @@
 
 - **Context:** DailyChecker dev Postgres remapped from host port 5432 → **5433** (5432 occupied by an unrelated local container).
 - **Correct Pattern:** `DATABASE_URL` in `backend/.env`/`.env.example` and `docker-compose.yml` all target 5433. Test helper auto-loads `backend/.env` via `godotenv` so integration tests actually run (not silently skipped). Bring the DB up with `make db-up` (or `docker compose up -d`) before `go test ./...`.
+
+## SQL UPDATE matches already-updated rows — check application state first
+
+- **Context:** DailyChecker M2 — `Logout` service method calling the `TokenRepository.Revoke` method on an already-revoked refresh token.
+- **Mistake:** `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1` matches the row regardless of whether `revoked_at` is already set, returning 1 row affected and no error. A second logout with the same token silently succeeded.
+- **Correct Pattern:** Before calling `Revoke`, fetch the token with `GetByHash` and inspect its application state (`RevokedAt != nil`) to detect the already-revoked case. Return a sentinel error (`ErrTokenInvalid`) rather than letting the DB mutation determine business validity.
