@@ -3,9 +3,9 @@
  * Nav links for Activities / History / Telegram are placeholders wired in M8.
  */
 
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -15,9 +15,54 @@ const NAV_ITEMS = [
   { label: 'Telegram', to: '/telegram' },
 ] as const
 
-export function AppShell() {
+function UserMenu() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    if (open) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  if (!user) return null
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="text-sm text-muted-foreground hover:text-foreground"
+      >
+        {user.name}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-36 rounded-md border border-border bg-background shadow-md">
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-muted"
+            onClick={() => { setOpen(false); navigate('/profile') }}
+          >
+            Profile
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-muted"
+            onClick={() => { setOpen(false); void logout() }}
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* ── Header ───────────────────────────────────────────────────────── */}
@@ -26,20 +71,7 @@ export function AppShell() {
           <span className="text-base font-semibold tracking-tight">
             DailyChecker
           </span>
-          <div className="flex items-center gap-3">
-            {user && (
-              <span className="hidden text-sm text-muted-foreground sm:inline">
-                {user.name}
-              </span>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void logout()}
-            >
-              Logout
-            </Button>
-          </div>
+          <UserMenu />
         </div>
       </header>
 

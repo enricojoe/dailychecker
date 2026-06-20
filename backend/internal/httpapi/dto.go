@@ -65,6 +65,21 @@ type RegisterRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 }
 
+// UpdateProfileRequest is the JSON body for PATCH /api/me. Every field is
+// optional; omit a field to leave it unchanged. When new_password is present,
+// current_password is required and must match the stored password.
+type UpdateProfileRequest struct {
+	Name            *string `json:"name"`
+	Username        *string `json:"username"`
+	CurrentPassword *string `json:"current_password"`
+	NewPassword     *string `json:"new_password"`
+}
+
+// CheckUsernameResponse is the JSON response for GET /api/auth/check-username.
+type CheckUsernameResponse struct {
+	Available bool `json:"available"`
+}
+
 // LoginRequest is the JSON body for POST /api/auth/login.
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`

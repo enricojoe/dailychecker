@@ -69,11 +69,13 @@ func NewRouter(
 	authGroup.POST("/login", ah.login)
 	authGroup.POST("/refresh", ah.refreshToken)
 	authGroup.POST("/logout", ah.logout)
+	authGroup.GET("/check-username", ah.checkUsername)
 
 	// Protected routes — all require a valid JWT Bearer access token.
 	protected := api.Group("")
 	protected.Use(auth.RequireAuth(jwtSecret))
 	protected.GET("/me", ah.me)
+	protected.PATCH("/me", ah.updateMe)
 
 	// Activities CRUD — all protected.
 	actGroup := protected.Group("/activities")

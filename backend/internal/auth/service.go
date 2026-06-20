@@ -115,6 +115,79 @@ func (s *Service) Me(ctx context.Context, userID string) (*users.User, error) {
 	return u, nil
 }
 
+// UpdateProfileInput carries the optional fields of a profile update. A nil
+// pointer means "leave unchanged". When NewPassword is non-nil, CurrentPassword
+// must also be supplied and match the stored hash.
+type UpdateProfileInput struct {
+	Name            *string
+	Username        *string
+	CurrentPassword *string
+	NewPassword     *string
+}
+
+// UpdateProfile applies a partial update to the authenticated user's name,
+// username, and/or password. Returns:
+//   - users.ErrConflict when the requested username is taken by another user,
+//   - ErrInvalidCredentials when changing the password but CurrentPassword is
+//     missing or does not match the stored hash.
+//
+// A username equal to the user's current username is a no-op for that field.
+func (s *Service) UpdateProfile(ctx context.Context, userID string, in UpdateProfileInput) (*users.User, error) {
+	u, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("auth service: update profile: %w", err)
+	}
+
+	if in.Name != nil {
+		u.Name = *in.Name
+	}
+
+	if in.Username != nil && *in.Username != u.Username {
+		// Pre-check for a friendlier 409; the DB unique constraint is the source
+		// of truth (handled by the repository on Update).
+		existing, err := s.users.GetByUsername(ctx, *in.Username)
+		switch {
+		case err == nil && existing.ID != u.ID:
+			return nil, users.ErrConflict
+		case err != nil && !errors.Is(err, users.ErrNotFound):
+			return nil, fmt.Errorf("auth service: update profile: username check: %w", err)
+		}
+		u.Username = *in.Username
+	}
+
+	if in.NewPassword != nil {
+		if in.CurrentPassword == nil {
+			return nil, ErrInvalidCredentials
+		}
+		if err := CheckPassword(u.PasswordHash, *in.CurrentPassword); err != nil {
+			return nil, ErrInvalidCredentials
+		}
+		hash, err := HashPassword(*in.NewPassword)
+		if err != nil {
+			return nil, fmt.Errorf("auth service: update profile: hash: %w", err)
+		}
+		u.PasswordHash = hash
+	}
+
+	if err := s.users.Update(ctx, u); err != nil {
+		return nil, fmt.Errorf("auth service: update profile: %w", err)
+	}
+	return u, nil
+}
+
+// UsernameAvailable reports whether username is free to claim. It returns true
+// when no user currently holds that username.
+func (s *Service) UsernameAvailable(ctx context.Context, username string) (bool, error) {
+	_, err := s.users.GetByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, users.ErrNotFound) {
+			return true, nil
+		}
+		return false, fmt.Errorf("auth service: username available: %w", err)
+	}
+	return false, nil
+}
+
 // issueTokenPair generates a new refresh token (persisted as its hash), signs a
 // new access token, and returns both to the caller.
 func (s *Service) issueTokenPair(ctx context.Context, userID string) (access, refresh string, err error) {

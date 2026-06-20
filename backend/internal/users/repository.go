@@ -54,9 +54,10 @@ type Repository interface {
 	// linking flow to consume a one-time token.
 	GetByLinkToken(ctx context.Context, token string) (*User, error)
 
-	// Update persists changes to Name and the Telegram fields (chat ID, link
-	// token, linked-at). UpdatedAt is refreshed by the database and written
-	// back into u.
+	// Update persists changes to Name, Username, PasswordHash, and the Telegram
+	// fields (chat ID, link token, linked-at). UpdatedAt is refreshed by the
+	// database and written back into u. Returns ErrConflict when the username
+	// collides with another user.
 	Update(ctx context.Context, u *User) error
 }
 
@@ -147,6 +148,8 @@ func (r *sqlxRepository) Update(ctx context.Context, u *User) error {
 	const q = `
 		UPDATE users SET
 			name                = :name,
+			username            = :username,
+			password_hash       = :password_hash,
 			telegram_chat_id    = :telegram_chat_id,
 			telegram_link_token = :telegram_link_token,
 			telegram_linked_at  = :telegram_linked_at,
@@ -164,6 +167,9 @@ func (r *sqlxRepository) Update(ctx context.Context, u *User) error {
 	if err := row.Scan(&u.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
+		}
+		if isUniqueViolation(err) {
+			return ErrConflict
 		}
 		return fmt.Errorf("users: update: %w", err)
 	}

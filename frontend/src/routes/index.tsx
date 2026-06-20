@@ -21,6 +21,7 @@ import { TodayPage } from '@/features/today/TodayPage'
 import { ActivitiesPage } from '@/features/activities/ActivitiesPage'
 import { HistoryPage } from '@/features/history/HistoryPage'
 import { TelegramPage } from '@/features/telegram/TelegramPage'
+import { ProfilePage } from '@/features/profile/ProfilePage'
 
 export const router = createBrowserRouter([
   {
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
               { path: '/activities', element: <ActivitiesPage /> },
               { path: '/history', element: <HistoryPage /> },
               { path: '/telegram', element: <TelegramPage /> },
+              { path: '/profile', element: <ProfilePage /> },
             ],
           },
         ],

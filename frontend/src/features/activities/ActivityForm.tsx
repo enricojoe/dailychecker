@@ -34,15 +34,35 @@ function defaultSchedule(a?: Activity): ScheduleValues {
   }
 }
 
+interface SubRow {
+  key: string
+  title: string
+}
+
 export function ActivityForm({ initial, parentId, onDone }: ActivityFormProps) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [titleError, setTitleError] = useState<string | null>(null)
   const [schedule, setSchedule] = useState<ScheduleValues>(() => defaultSchedule(initial))
   const [serverError, setServerError] = useState<string | null>(null)
 
+  // Sub-activities are only offered when creating a brand-new top-level
+  // activity (not when editing, and not when already creating a child).
+  const allowSubActivities = !initial && !parentId
+  const [subRows, setSubRows] = useState<SubRow[]>([])
+
   const createMutation = useCreateActivity()
   const updateMutation = useUpdateActivity()
   const isPending = createMutation.isPending || updateMutation.isPending
+
+  function addSubRow() {
+    setSubRows((rows) => [...rows, { key: crypto.randomUUID(), title: '' }])
+  }
+  function updateSubRow(key: string, value: string) {
+    setSubRows((rows) => rows.map((r) => (r.key === key ? { ...r, title: value } : r)))
+  }
+  function removeSubRow(key: string) {
+    setSubRows((rows) => rows.filter((r) => r.key !== key))
+  }
 
   function validate(): boolean {
     if (!title.trim()) {
@@ -76,11 +96,33 @@ export function ActivityForm({ initial, parentId, onDone }: ActivityFormProps) {
       if (initial) {
         await updateMutation.mutateAsync({ id: initial.id, dto })
       } else {
-        await createMutation.mutateAsync({ ...dto, parent_id: parentId })
+        const created = await createMutation.mutateAsync({ ...dto, parent_id: parentId })
+
+        // Create any sub-activities under the freshly created parent. They
+        // inherit the parent's schedule; only the title differs.
+        if (allowSubActivities) {
+          const subs = subRows
+            .map((r) => r.title.trim())
+            .filter((t) => t.length > 0)
+          for (const [index, subTitle] of subs.entries()) {
+            await createMutation.mutateAsync({
+              ...dto,
+              title: subTitle,
+              parent_id: created.id,
+              sort_order: index,
+            })
+          }
+        }
       }
       onDone()
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Something went wrong.')
+      const base = err instanceof Error ? err.message : 'Something went wrong.'
+      const hasSubs = allowSubActivities && subRows.some((r) => r.title.trim())
+      setServerError(
+        hasSubs
+          ? `${base} (some items may have been partially created — check the list)`
+          : base
+      )
     }
   }
 
@@ -105,6 +147,48 @@ export function ActivityForm({ initial, parentId, onDone }: ActivityFormProps) {
       </div>
 
       <ScheduleEditor values={schedule} onChange={setSchedule} disabled={isPending} />
+
+      {/* Sub-activities (create-only) — added together with the parent. */}
+      {allowSubActivities && (
+        <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
+          <div className="flex items-center justify-between">
+            <Label>Sub-activities (optional)</Label>
+            <Button type="button" size="xs" variant="outline" onClick={addSubRow} disabled={isPending}>
+              + Add
+            </Button>
+          </div>
+          {subRows.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Break this activity into smaller steps. They inherit the schedule above.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {subRows.map((row, i) => (
+                <li key={row.key} className="flex items-center gap-2">
+                  <Input
+                    value={row.title}
+                    onChange={(e) => updateSubRow(row.key, e.target.value)}
+                    disabled={isPending}
+                    placeholder={`Sub-activity ${i + 1}`}
+                    aria-label={`Sub-activity ${i + 1} title`}
+                  />
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => removeSubRow(row.key)}
+                    disabled={isPending}
+                    aria-label={`Remove sub-activity ${i + 1}`}
+                  >
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {serverError && (
         <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
