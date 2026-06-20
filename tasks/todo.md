@@ -10,6 +10,6 @@
   - [x] M4 — Occurrences, today view & history → See [tasks/plans/m4-occurrences-today-history.md](plans/m4-occurrences-today-history.md)
   - [x] M5 — Telegram integration (linking + sending; live DM check deferred) → See [tasks/plans/m5-telegram.md](plans/m5-telegram.md)
   - [x] M6 — Scheduler (per-activity reminders + nightly digest) → See [tasks/plans/m6-scheduler.md](plans/m6-scheduler.md)
-  - [ ] M7 — Frontend: auth & shell
+  - [x] M7 — Frontend: auth & shell → See [tasks/plans/m7-frontend-auth-shell.md](plans/m7-frontend-auth-shell.md)
   - [ ] M8 — Frontend: activities, today, history, telegram
   - [ ] M9 — Hardening, docs & deployment
