@@ -4,7 +4,7 @@
 
 - [ ] Build DailyChecker (Go/Gin/sqlx + Postgres backend, React/Vite frontend, Telegram reminders) → See [tasks/plans/dailychecker.md](plans/dailychecker.md)
   - [x] M0 — Project scaffolding & tooling
-  - [ ] M1 — Database schema & migrations
+  - [x] M1 — Database schema & migrations
   - [ ] M2 — Auth (register/login/refresh)
   - [ ] M3 — Activities & sub-activities + state rollup
   - [ ] M4 — Occurrences, today view & history

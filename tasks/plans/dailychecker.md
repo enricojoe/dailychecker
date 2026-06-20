@@ -191,11 +191,11 @@ Done** is met and verified, then fill in the Result note.
 - **Result:** _2026-06-19_ — Backend & frontend scaffolds delivered by go-gin-backend-architect + react-frontend-expert agents in parallel, both self-verified. Stack: React 19 / Vite 8 / Tailwind v4 / shadcn (base-ui) / TanStack Query 5; Go 1.26 / Gin / sqlx / lib/pq / golang-migrate. **Note:** local port 5432 is occupied by an unrelated `lotrack-db` container — stop it before `make db-up`, or remap to 5433 (deferred, not blocking). Migration runner no-ops cleanly until M1 adds `.sql` files.
 
 ### Milestone 1 — Database Schema & Migrations
-- [ ] Migrations for `users`, `refresh_tokens`, `activities`, `occurrences`
-- [ ] Indexes: `activities(user_id, is_active)`, `occurrences(activity_id, occur_date)` unique, `occurrences(occur_date, state)` for digest
-- [ ] sqlx repositories with basic CRUD + integration tests against a test DB
+- [x] Migrations for `users`, `refresh_tokens`, `activities`, `occurrences`
+- [x] Indexes: `activities(user_id, is_active)`, `occurrences(activity_id, occur_date)` unique, `occurrences(occur_date, state)` for digest
+- [x] sqlx repositories with basic CRUD + integration tests against a test DB
 - **DoD:** `migrate up`/`down` run cleanly; repo tests pass.
-- **Result:** _TBD_
+- **Result:** _2026-06-20_ — Completed & verified (commit `de4877a`). 4 migrations (uuid PKs, FKs, `pending|partial|done` state, unique `(activity_id, occur_date)`); indexes per DoD present. Programmatic golang-migrate runner gained `RunMigrationsDown` + isolated short-lived connection so `m.Close()` never touches the app pool; up→down→up cycle test passes against real Postgres. sqlx repos for users/auth/activities/occurrences with 27 passing integration subtests (testhelper auto-loads `backend/.env` via godotenv). Fixed prior session's build break (missing `lib/pq` import) and switched activities queries off `SELECT *` to explicit columns with `time_of_day::TEXT` to avoid lib/pq TIME→time.Time scan issues. `go build`/`go vet` clean. Tests run against the dev DB on host port 5433.
 
 ### Milestone 2 — Auth (register, login, refresh, middleware)
 - [ ] bcrypt password hashing
