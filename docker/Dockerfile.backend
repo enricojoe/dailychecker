@@ -1,14 +1,15 @@
 # syntax=docker/dockerfile:1
+# Build context is the repo root (see docker/docker-compose.yml).
 
 # ── Build stage ──────────────────────────────────────────────────────────────
 FROM golang:1.26-alpine AS build
 WORKDIR /src
 
 # Cache modules first for faster rebuilds.
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-COPY . .
+COPY backend/ .
 # Static binary so it runs on a minimal base.
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server ./cmd/server
 

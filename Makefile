@@ -1,5 +1,7 @@
 .PHONY: run build test db-up db-down docker-build docker-up docker-down
 
+COMPOSE := docker compose -f docker/docker-compose.yml
+
 ## run: start the backend dev server (requires Postgres via db-up)
 run:
 	cd backend && go run ./cmd/server
@@ -14,20 +16,24 @@ test:
 
 ## db-up: start Postgres in Docker (detached)
 db-up:
-	docker compose up -d
+	$(COMPOSE) up -d db
 
 ## db-down: stop and remove Docker containers
 db-down:
-	docker compose down
+	$(COMPOSE) down
+
+## docker-env: create docker/.env from the template if it doesn't exist
+docker-env:
+	@test -f docker/.env || (cp docker/.env.example docker/.env && echo "created docker/.env from template")
 
 ## docker-build: build the backend + frontend images (full stack)
-docker-build:
-	docker compose --profile full build
+docker-build: docker-env
+	$(COMPOSE) --profile full build
 
 ## docker-up: run the full stack (db + backend + frontend) detached
-docker-up:
-	docker compose --profile full up -d --build
+docker-up: docker-env
+	$(COMPOSE) --profile full up -d --build
 
 ## docker-down: stop and remove the full stack
 docker-down:
-	docker compose --profile full down
+	$(COMPOSE) --profile full down

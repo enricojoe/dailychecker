@@ -1,0 +1,58 @@
+# Pinned project name so the file can live in docker/ without changing the
+# Compose project (which would orphan the existing dailychecker_postgres_data
+# volume and rename containers).
+name: dailychecker
+
+services:
+  db:
+    image: postgres:16
+    env_file:
+      - ./.env
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Full-stack services (profile "full") ──────────────────────────────────
+  # docker compose -f docker/docker-compose.yml up -d            → only db (dev)
+  # docker compose -f docker/docker-compose.yml --profile full up → db+backend+frontend
+  backend:
+    profiles: ["full"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    # All backend runtime configuration comes from docker/.env.
+    env_file:
+      - ./.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    profiles: ["full"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        # Baked into the bundle at build time (Vite inlines VITE_* vars).
+        # Value is interpolated from docker/.env.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

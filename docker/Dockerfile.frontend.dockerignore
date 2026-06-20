@@ -1,0 +1,12 @@
+# Build context is the repo root; keep only what the frontend image needs
+# (frontend/ source + docker/nginx.conf). Patterns are relative to the context root.
+backend
+tasks
+.git
+**/node_modules
+frontend/dist
+frontend/.vite
+**/*.env
+!**/*.env.example
+**/*.log
+.DS_Store

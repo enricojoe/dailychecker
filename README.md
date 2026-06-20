@@ -41,6 +41,9 @@ backend/
 frontend/
   src/api/  src/auth/  src/routes/  src/components/
   src/features/{activities,today,history,telegram}/
+docker/             # all container assets
+  docker-compose.yml  Dockerfile.backend  Dockerfile.frontend
+  nginx.conf  .env.example   # .env (gitignored) holds the compose environment
 ```
 
 ## Prerequisites
@@ -73,6 +76,9 @@ them off on the Today page. The backend already allows the `:5173` origin via
 
 ## Running with Docker (full stack)
 
+All container assets live in `docker/`. The compose environment is a single file,
+`docker/.env` (copied from `docker/.env.example` automatically by the make targets).
+
 ```bash
 make docker-up      # builds + starts db + backend + frontend
 #   frontend → http://localhost:8081
@@ -81,12 +87,12 @@ make docker-down
 ```
 
 The full stack is gated behind a Compose `full` profile, so plain
-`docker compose up -d` (and `make db-up`) still starts **only** Postgres for the
-local dev workflow above.
+`docker compose -f docker/docker-compose.yml up -d` (and `make db-up`) still starts
+**only** Postgres for the local dev workflow above.
 
 > Note: the frontend image bakes `VITE_API_BASE_URL` at build time (Vite inlines
-> `VITE_*` vars). The bundled default is `http://localhost:8080/api`; change the
-> `frontend` build arg in `docker-compose.yml` to point at another API origin.
+> `VITE_*` vars). The bundled default is `http://localhost:8080/api`; change
+> `VITE_API_BASE_URL` in `docker/.env` to point at another API origin.
 
 ## Environment variables
 
